@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES6",
-    "ignoreDeprecations": "5.0",
+    "target": "ES2022",
+    "module": "ESNext",                          /* 💡 NodeNext ના બદલે ESNext */
+    "moduleResolution": "Bundler",               /* 💡 આનાથી એક્સ્ટેન્શન લખવાની જરૂર નહીં પડે */
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
