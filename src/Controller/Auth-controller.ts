@@ -28,14 +28,14 @@ export const login = async (req: Request, res: Response) => {
                                     (user.password.startsWith('$2b$') && await bcrypt.compare(password, user.password));
 
             if (isPasswordMatch) {
+                const userResponseData = { ...user };
+
+                delete userResponseData.password;
+
                 return res.json({
                     success: true,
                     message: "Logged in successfully",
-                    user: { 
-                        id: user.id, 
-                        username: user.username, 
-                        role: user.role
-                    }
+                    user: userResponseData 
                 });
             }
         }
