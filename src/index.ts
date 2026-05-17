@@ -1,18 +1,24 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path'; 
+import fs from 'fs';     
 import router from './Route/Routes.js'; 
 
 const app = express();
 
-// 1. CORS મિડલવેર - લાઈવ Vercel અને Localhost બંને માટે સેટિંગ
+// જો 'uploads' ફોલ્ડર ન હોય, તો સર્વર રન થતા જ આપોઆપ બની જશે
+const uploadDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const allowedOrigins = [
-    'http://localhost:5173', // લોકલ ફ્રન્ટએન્ડ માટે
-    'https://gurukul-ochre.vercel.app' // તમારા લાઈવ Vercel ડોમેન માટે
+    'http://localhost:5173',
+    'https://gurukul-ochre.vercel.app'
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
-        // જો કોઈ ઓરિજિન ન હોય (જેમ કે Postman) અથવા એલાઉડ લિસ્ટમાં હોય
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
@@ -23,14 +29,14 @@ app.use(cors({
     credentials: true
 }));
 
-// 2. બોડી પાર્સર મિડલવેર
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// 3. રાઉટ્સ સેટિંગ
+// ઈમેજ લાઈવ URL તરીકે એક્સેસ કરવા માટે સ્ટેટિક ફોલ્ડર સેટઅપ
+app.use('/uploads', express.static(uploadDir));
+
 app.use('/', router); 
 
-// 4. સર્વર લિસનર - Render નો પોર્ટ ઓટોમેટિકલી લેવા માટે
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✅ Backend running on port ${PORT}`);
