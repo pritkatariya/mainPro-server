@@ -28,6 +28,7 @@ export const login = async (req: Request, res: Response) => {
                                     (user.password.startsWith('$2b$') && await bcrypt.compare(password, user.password));
 
             if (isPasswordMatch) {
+                // 💡 ૧. ડેટાબેઝમાંથી આવેલી આખી યુઝર રો (Row) ની કોપી બનાવો
                 const userResponseData = { ...user };
 
                 delete userResponseData.password;
