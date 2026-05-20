@@ -1,24 +1,83 @@
-import multer from 'multer';
-import path from 'path';
+import { Request } from "express";
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import dotenv from "dotenv";
 
-// ઈમેજ ક્યાં સેવ કરવી અને તેનું નામ કેવું રાખવું તેનું સેટિંગ
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/'); // પ્રોજેક્ટના મેઈન ફોલ્ડરમાં 'uploads' નામનું ફોલ્ડર
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname)); // દા.ત. 17154728-45214.jpg
-    }
+dotenv.config();
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ફક્ત ઇમેજ ફાઇલો જ અપલોડ થાય તે માટે ફિલ્ટર
-const fileFilter = (req: any, file: any, cb: any) => {
-    if (file.mimetype.startsWith('image/')) {
+const storage = new CloudinaryStorage({
+    cloudinary,
+    params: async (_req: Request, file: Express.Multer.File) => {
+        const isAudio =
+            file.mimetype.startsWith("audio/") ||
+            file.originalname.toLowerCase().endsWith(".mp3");
+
+        const cleanName = file.originalname
+            .split(".")[0]
+            .replace(/[^a-zA-Z0-9]/g, "-")
+            .toLowerCase();
+
+        return {
+            folder: "gurukul_assets",
+            resource_type: isAudio ? "video" : "image",
+            allowed_formats: [
+                "jpg",
+                "jpeg",
+                "png",
+                "webp",
+                "avif",
+                "gif",
+                "mp3",
+                "wav",
+            ],
+            public_id: `${Date.now()}-${cleanName}`,
+        } as any;
+    },
+});
+
+const fileFilter = (
+    _req: Request,
+    file: Express.Multer.File,
+    cb: multer.FileFilterCallback
+) => {
+    const fileName = file.originalname.toLowerCase();
+
+    const isImage =
+        file.mimetype.startsWith("image/") ||
+        fileName.endsWith(".jpg") ||
+        fileName.endsWith(".jpeg") ||
+        fileName.endsWith(".png") ||
+        fileName.endsWith(".webp") ||
+        fileName.endsWith(".avif") ||
+        fileName.endsWith(".gif");
+
+    const isAudio =
+        file.mimetype.startsWith("audio/") ||
+        fileName.endsWith(".mp3") ||
+        fileName.endsWith(".wav");
+
+    if (isImage || isAudio) {
         cb(null, true);
-    } else {
-        cb(new Error('Only image files are allowed!'), false);
+        return;
     }
+
+    cb(new Error("Only image and MP3/WAV audio files are allowed!"));
 };
 
-export const upload = multer({ storage, fileFilter });
+export const upload = multer({
+    storage,
+    fileFilter,
+    limits: {
+        fileSize: 50 * 1024 * 1024,
+        files: 500,
+        fields: 500,
+        parts: 1000,
+    },
+});

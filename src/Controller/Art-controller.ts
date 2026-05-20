@@ -83,7 +83,7 @@ export const approveGurukulArtRequest = async (req: Request, res: Response): Pro
         }
         const updateQuery = `UPDATE admit_requests SET status = 'Approved' WHERE id = $1 AND department_id = 2 RETURNING id, name, status;`;
         let updatedRow = null;
-        try { updatedRow = (await pool.query(updateQuery, [id])).rows[0]; } 
+        try { updatedRow = (await pool.query(updateQuery, [id])).rows[0]; }
         catch (err) { updatedRow = (await neonPool.query(updateQuery, [id])).rows[0]; }
         if (!updatedRow) return res.status(404).json({ success: false, message: "રિક્વેસ્ટ મળી નથી." });
         return res.status(200).json({ success: true, message: `Gurukul Art Request Approved! ✅`, data: updatedRow });
@@ -103,7 +103,7 @@ export const declineGurukulArtRequest = async (req: Request, res: Response): Pro
         }
         const updateQuery = `UPDATE admit_requests SET status = 'Declined' WHERE id = $1 AND department_id = 2 RETURNING id, name, status;`;
         let updatedRow = null;
-        try { updatedRow = (await pool.query(updateQuery, [id])).rows[0]; } 
+        try { updatedRow = (await pool.query(updateQuery, [id])).rows[0]; }
         catch (err) { updatedRow = (await neonPool.query(updateQuery, [id])).rows[0]; }
         if (!updatedRow) return res.status(404).json({ success: false, message: "રિક્વેસ્ટ મળી નથી." });
         return res.status(200).json({ success: true, message: `Gurukul Art Request Declined! ❌`, data: updatedRow });

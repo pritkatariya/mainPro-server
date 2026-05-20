@@ -1,29 +1,27 @@
 import { Router } from 'express';
-import multer from 'multer';
-import path from 'path';
 import * as UserController from '../Controller/User-controller.js';
 import * as AuthController from '../Controller/Auth-controller.js';
 import * as RoleController from '../Controller/Role-controller.js';
 import * as GMusicController from '../Controller/Gmusic-controller.js';
 import * as ArtController from '../Controller/Art-controller.js';
 import { verifySuidUser } from '../middleware/Verify-suid.js';
-// 🎯 આપણા નવા એપ્લિકેશન કંટ્રોલરને ઇમ્પોર્ટ કરો
+import overviewRoutes from "./Overview-routes.js"; 
 import * as ApplicationController from '../Controller/Application-controller.js';
+import { getOverviewConfig, updateOverviewConfig } from '../Controller/Overview-controller.js';
+import { getAllSongs, uploadSong, deleteSong } from '../Controller/Music-controller.js';
+import { upload } from '../middleware/upload.js'; 
     
 const router = Router();
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/'),
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
-const upload = multer({ storage: storage });
+router.use("/overview", overviewRoutes);
+
+router.get('/music/songs', getAllSongs);
+router.post('/music/upload', upload.single('audio'), uploadSong);
+router.delete('/music/songs/:id', deleteSong);
+
 
 router.post('/auth/login', AuthController.login);
 router.get('/auth/departments', AuthController.getAllDepartments);
-
 router.post('/auth/forgot-password-request', verifySuidUser, ApplicationController.submitApplication);
 
 router.post('/create/user', upload.single('image'), UserController.createUser);
@@ -31,7 +29,6 @@ router.get('/user/alldata', UserController.UserAllDataList);
 
 router.post('/auth/create-role', RoleController.createRole);
 router.get('/auth/role/alldata', RoleController.RoleAllData);
-
 router.get('/roll/alldata', RoleController.RoleAllData);
 
 router.post('/g-music/create-request', upload.single('image'), GMusicController.createGMusicRequest);
