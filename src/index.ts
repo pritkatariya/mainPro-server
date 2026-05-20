@@ -8,32 +8,32 @@ import rootRouter from './Route/Routes.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-    res.header("Access-Control-Allow-Origin", "http://localhost:5173");
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-    if (req.method === "OPTIONS") {
-        return res.sendStatus(200);
-    }
-    next();
-});
+const allowedOrigins = [
+    'http://localhost:5173', 
+    'https://gurukul-ochre.vercel.app'
+];
 
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 }));
 
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-app.use('/overview', overviewRoutes); // 🎯 આ લાઇન અહીં હોવી અત્યંત જરૂરી છે!
+app.use('/overview', overviewRoutes);
 app.use('/', rootRouter);
 
 app.get('/health', (req: Request, res: Response) => {
@@ -43,6 +43,6 @@ app.get('/health', (req: Request, res: Response) => {
 app.listen(PORT, () => {
     console.log(`=========================================`);
     console.log(`🚀 SERVER IS RUNNING ON PORT: ${PORT}`);
-    console.log(`🔒 CORS FOR PATCH METHOD IS ACTIVATED`);
+    console.log(`✅ CORS IS CONFIGURED FOR PRODUCTION`);
     console.log(`=========================================`);
 });
