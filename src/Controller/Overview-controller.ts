@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import db from "../database/db.js";
+import db from "../database/index.js";
 import { uploadToSupabase } from "../middleware/upload.js"; // તમારા સાચા પાથ મુજબ ઈમ્પોર્ટ કરો
 
 interface OverviewConfig {
