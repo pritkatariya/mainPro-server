@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import db from "../database/db.js";
+import { uploadToSupabase } from "../middleware/upload.js"; // તમારા સાચા પાથ મુજબ ઈમ્પોર્ટ કરો
 
 interface OverviewConfig {
     heroImages: string[];
@@ -33,11 +34,6 @@ const defaultConfig: OverviewConfig = {
     chromaSubtitle: "Move cursor over cards to reveal color spotlight.",
     chromaImages: [],
     showChromaSection: true,
-};
-
-const getFileUrl = (file?: Express.Multer.File): string => {
-    if (!file) return "";
-    return file.path;
 };
 
 const toBoolean = (value: unknown, fallback: boolean): boolean => {
@@ -100,6 +96,7 @@ const parseExisting = (bodyValue: unknown, fallback: string[]): string[] => {
     }
 };
 
+// --- GET CONFIGURATION ---
 export const getOverviewConfig = async (_req: Request, res: Response): Promise<Response> => {
     try {
         const result = await db.query("SELECT * FROM overview_config WHERE id = 1");
@@ -116,40 +113,79 @@ export const getOverviewConfig = async (_req: Request, res: Response): Promise<R
     }
 };
 
+// --- UPDATE CONFIGURATION (With Supabase Upload) ---
 export const updateOverviewConfig = async (req: Request, res: Response): Promise<Response> => {
     try {
         const currentResult = await db.query("SELECT * FROM overview_config WHERE id = 1");
         const current = rowToConfig(currentResult.rows[0]);
         const reqFiles = req.files as Record<string, Express.Multer.File[]> | undefined;
 
+        // ૧. નવી મલ્ટીપલ ફાઈલોને Supabase પર અપલોડ કરવાનું લોજિક
+        const newHeroUrls: string[] = [];
+        if (reqFiles?.heroImages) {
+            for (const file of reqFiles.heroImages) {
+                const url = await uploadToSupabase(file);
+                newHeroUrls.push(url);
+            }
+        }
+
+        const newCampusGalleryUrls: string[] = [];
+        if (reqFiles?.campusGalleryImages) {
+            for (const file of reqFiles.campusGalleryImages) {
+                const url = await uploadToSupabase(file);
+                newCampusGalleryUrls.push(url);
+            }
+        }
+
+        const newStackUrls: string[] = [];
+        if (reqFiles?.stackImages) {
+            for (const file of reqFiles.stackImages) {
+                const url = await uploadToSupabase(file);
+                newStackUrls.push(url);
+            }
+        }
+
+        const newChromaUrls: string[] = [];
+        if (reqFiles?.chromaImages) {
+            for (const file of reqFiles.chromaImages) {
+                const url = await uploadToSupabase(file);
+                newChromaUrls.push(url);
+            }
+        }
+
+        // ૨. નવી સિંગલ ફાઈલોને Supabase પર અપલોડ કરવાનું લોજિક
+        let logoImage = req.body.logoImage ?? current.logoImage;
+        if (reqFiles?.logoImage?.[0]) {
+            logoImage = await uploadToSupabase(reqFiles.logoImage[0]);
+        }
+
+        let campusImage = req.body.campusImage ?? current.campusImage;
+        if (reqFiles?.campusImage?.[0]) {
+            campusImage = await uploadToSupabase(reqFiles.campusImage[0]);
+        }
+
+        // ૩. એક્ઝિસ્ટિંગ અને નવી પબ્લિક URLs ને ભેગી કરવી
         const heroImages = [
             ...parseExisting(req.body.existingHeroImages, current.heroImages),
-            ...(reqFiles?.heroImages?.map(getFileUrl) || []),
+            ...newHeroUrls,
         ];
 
         const campusGalleryImages = [
             ...parseExisting(req.body.existingCampusGalleryImages, current.campusGalleryImages),
-            ...(reqFiles?.campusGalleryImages?.map(getFileUrl) || []),
+            ...newCampusGalleryUrls,
         ];
 
         const stackImages = [
             ...parseExisting(req.body.existingStackImages, current.stackImages),
-            ...(reqFiles?.stackImages?.map(getFileUrl) || []),
+            ...newStackUrls,
         ];
 
         const chromaImages = [
             ...parseExisting(req.body.existingChromaImages, current.chromaImages),
-            ...(reqFiles?.chromaImages?.map(getFileUrl) || []),
+            ...newChromaUrls,
         ];
 
-        const logoImage = reqFiles?.logoImage?.[0]
-            ? getFileUrl(reqFiles.logoImage[0])
-            : req.body.logoImage ?? current.logoImage;
-
-        const campusImage = reqFiles?.campusImage?.[0]
-            ? getFileUrl(reqFiles.campusImage[0])
-            : req.body.campusImage ?? current.campusImage;
-
+        // ૪. PostgreSQL (Neon Database) Query
         const queryText = `
             INSERT INTO overview_config (
                 id,
