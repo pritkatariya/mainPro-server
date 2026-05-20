@@ -6,13 +6,13 @@ const connectionString = "postgresql://neondb_owner:npg_1wb8UYBukIsl@ep-aged-clo
 
 const neonPool = new Pool({
     connectionString: connectionString,
-    // 💡 કનેક્શન અચાનક બંધ ન થાય તે માટે આ ખાસ ઓપ્શન્સ ઉમેર્યા છે
+    ssl: { rejectUnauthorized: false }, // લાઈવ ડેટાબેઝ માટે આ લાઈન ફરજિયાત છે
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
 });
 
-// 🔥 ગ્લોબલ એરર હેન્ડલર (આનાથી જો કનેક્શન ડ્રોપ થશે તો પણ તમારું નોડ સર્વર ક્રેશ નહીં થાય)
+// ગ્લોબલ એરર હેન્ડલર
 neonPool.on('error', (err) => {
     console.error('⚠️ Neon Cloud Pool unexpected error:', err.message);
 });
@@ -22,7 +22,7 @@ neonPool.connect((err, client, release) => {
         console.error('❌ Neon Cloud connection error:', err.stack);
     } else {
         console.log('🌐 Connected to Online Neon PostgreSQL (Gurukul) successfully! 🔥');
-        if (release) release(); // કનેક્શન ચેક કરીને તરત જ ક્લાયન્ટને પૂલમાં પાછો મુકી દેશે
+        if (client) release();
     }
 });
 

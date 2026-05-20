@@ -5,15 +5,16 @@ const pool = new Pool({
     user: 'postgres',
     host: 'localhost',
     database: 'DEV',
-    password: '5432',
+    password: '5432', // તમારો લોકલ પાસવર્ડ જો હોય તો લખો
     port: 5432,
 });
 
-pool.connect((err) => {
+pool.connect((err, client, release) => {
     if (err) {
-        console.error('Database connection error:', err.stack);
+        console.error('❌ Local Database connection error:', err.stack);
     } else {
-        console.log('Connected to Local pgAdmin (DEV) successfully');
+        console.log('💻 Connected to Local pgAdmin (DEV) successfully! 🔥');
+        if (client) release();
     }
 });
 
