@@ -102,6 +102,7 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
 
         try {
             const result = await pool.query(insertUserQuery, userParams);
+            const neonResult = await neonPool.query(insertUserQuery, userParams);
             localNewUser = result.rows[0];
             localSuccess = true;
         } catch (error) {

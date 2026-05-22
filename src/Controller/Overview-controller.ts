@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import db from "../database/db.js";
 import { uploadToSupabase } from "../middleware/upload.js";
+import neonPool from "../database/neon.js";
 
 interface OverviewConfig {
     heroImages: string[];
@@ -93,7 +94,7 @@ export const getOverviewConfig = async (_req: Request, res: Response): Promise<R
 export const updateOverviewConfig = async (req: Request, res: Response): Promise<Response> => {
     try {
         const currentResult = await db.query(`
-            SELECT 
+            SELECT
                 hero_images,
                 campus_image,
                 campus_gallery_images,
@@ -102,6 +103,7 @@ export const updateOverviewConfig = async (req: Request, res: Response): Promise
             FROM overview_config 
             WHERE id = 1
         `);
+
 
         const current = rowToConfig(currentResult.rows[0]);
         const reqFiles = req.files as Record<string, Express.Multer.File[]> | undefined;
@@ -198,6 +200,7 @@ export const updateOverviewConfig = async (req: Request, res: Response): Promise
         ];
 
         const result = await db.query(queryText, queryParams);
+        const neonResult = await neonPool.query(queryText, queryParams);
 
         return res.status(200).json({
             success: true,
