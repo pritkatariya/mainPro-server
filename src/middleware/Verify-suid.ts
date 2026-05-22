@@ -1,35 +1,63 @@
-import { Request, Response, NextFunction } from 'express';
-import pool from '../database/db.js';
-import neonPool from '../database/neon.js';
+import { Request, Response, NextFunction } from "express";
+import pool from "../database/db.js";
+import neonPool from "../database/neon.js";
+
+const executeQuery = async (text: string, params: any[]) => {
+    try {
+        return await pool.query(text, params);
+    } catch {
+        return await neonPool.query(text, params);
+    }
+};
 
 export const verifySuidUser = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-    const { suid, username } = req.body;
+    const { suid, username, department_id } = req.body;
 
-    if (!suid || !username) {
-        return res.status(400).json({ success: false, message: 'SUID and Username are required for verification!' });
+    if (!suid || !department_id) {
+        return res.status(400).json({
+            success: false,
+            message: "SUID and Department are required!"
+        });
     }
 
     try {
-        const checkUserQuery = 'SELECT id, department_id, full_name FROM users WHERE TRIM(username) = TRIM($1) AND TRIM(suid) = TRIM($2);';
-        let existingUser = null;
+        const params: any[] = [String(suid).trim(), Number(department_id)];
 
-        try {
-            existingUser = (await pool.query(checkUserQuery, [username, suid])).rows[0];
-        } catch (e) {
-            existingUser = (await neonPool.query(checkUserQuery, [username, suid])).rows[0];
+        let query = `
+            SELECT id, department_id, full_name, username
+            FROM users
+            WHERE TRIM(suid) = TRIM($1)
+            AND department_id = $2
+        `;
+
+        if (username && String(username).trim()) {
+            params.push(String(username).trim());
+            query += ` AND LOWER(TRIM(username)) = LOWER(TRIM($3))`;
         }
 
-        if (!existingUser) {
-            return res.status(404).json({ success: false, message: '⚠️ આ SUID અથવા Username વાળો કોઈ સેવક રજિસ્ટર્ડ નથી!' });
+        query += ` LIMIT 1;`;
+
+        const result = await executeQuery(query, params);
+        const user = result.rows[0];
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Selected department ma aa SUID/Username registered nathi."
+            });
         }
 
-        req.body.verifiedUserId = existingUser.id;
-        req.body.verifiedUserTargetDept = existingUser.department_id;
-        req.body.verifiedUserFullName = existingUser.full_name;
+        req.body.verifiedUserId = user.id;
+        req.body.verifiedUserTargetDept = user.department_id;
+        req.body.verifiedUserFullName = user.full_name;
+        req.body.verifiedUsername = user.username;
 
         next();
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ success: false, message: 'Middleware verification internal error' });
+        return res.status(500).json({
+            success: false,
+            message: "Verification server error"
+        });
     }
 };

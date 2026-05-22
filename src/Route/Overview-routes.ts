@@ -6,16 +6,11 @@ import { getOverviewConfig, updateOverviewConfig } from "../Controller/Overview-
 const router = Router();
 
 const overviewUpload = upload.fields([
-    { name: "heroImages", maxCount: 100 },
+    { name: "heroImages", maxCount: 20 },
     { name: "logoImage", maxCount: 1 },
     { name: "campusImage", maxCount: 1 },
-    { name: "campusGalleryImages", maxCount: 100 },
-    { name: "stackImages", maxCount: 100 },
-    { name: "chromaImages", maxCount: 100 },
-
-    // Legacy field: frontend/cache ma haju domeImages send thatu hoy to 400 na aave.
-    // Controller aa field ignore kare chhe.
-    { name: "domeImages", maxCount: 100 },
+    { name: "campusGalleryImages", maxCount: 10 },
+    { name: "dailyDarshanImages", maxCount: 10 },
 ]);
 
 const handleUploadErrors = (req: Request, res: Response, next: NextFunction) => {
