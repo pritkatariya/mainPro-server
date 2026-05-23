@@ -77,6 +77,17 @@ export const getOverviewConfig = async (_req: Request, res: Response): Promise<R
             WHERE id = 1
         `);
 
+        const resultCount = await neonPool.query(`
+            SELECT 
+                hero_images,
+                campus_image,
+                campus_gallery_images,
+                logo_image,
+                daily_darshan_images
+            FROM overview_config 
+            WHERE id = 1
+        `);
+
         return res.status(200).json({
             success: true,
             config: rowToConfig(result.rows[0]),

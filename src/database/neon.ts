@@ -6,10 +6,13 @@ const connectionString = "postgresql://neondb_owner:npg_1wb8UYBukIsl@ep-aged-clo
 
 const neonPool = new Pool({
     connectionString: connectionString,
-    // 💡 કનેક્શન અચાનક બંધ ન થાય તે માટે આ ખાસ ઓપ્શન્સ ઉમેર્યા છે
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
+    // SSL માટે આ ફેરફાર કરો:
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
 // 🔥 ગ્લોબલ એરર હેન્ડલર (આનાથી જો કનેક્શન ડ્રોપ થશે તો પણ તમારું નોડ સર્વર ક્રેશ નહીં થાય)
