@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import pool from "../database/start";
+import pool from "../database/start.js";
 
 // ક્લાઉડિનરી લિંક મેળવવા માટેનું હેલ્પર
 const getFileUrl = (file?: Express.Multer.File) => {
