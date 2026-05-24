@@ -1,12 +1,11 @@
 import { Request, Response, NextFunction } from "express";
-import pool from "../database/db.js";
-import neonPool from "../database/neon.js";
+import pool from "../database/start.js";
 
 const executeQuery = async (text: string, params: any[]) => {
     try {
         return await pool.query(text, params);
     } catch {
-        return await neonPool.query(text, params);
+        throw new Error("Database query failed");
     }
 };
 

@@ -1,14 +1,14 @@
 import { Request, Response } from "express";
-import pool from "../database/db.js";
-import neonPool from "../database/neon.js";
+import pool from "../database/start.js";
 import bcrypt from "bcrypt";
 import { uploadToSupabase } from "../middleware/upload.js";
 
 const executeQuery = async (text: string, params: any[] = []) => {
     try {
         return await pool.query(text, params);
-    } catch {
-        return await neonPool.query(text, params);
+    } catch (error) {
+        console.error("Database query error:", error);
+        throw error;
     }
 };
 
@@ -102,7 +102,6 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
 
         try {
             const result = await pool.query(insertUserQuery, userParams);
-            const neonResult = await neonPool.query(insertUserQuery, userParams);
             localNewUser = result.rows[0];
             localSuccess = true;
         } catch (error) {
@@ -111,7 +110,7 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
         }
 
         try {
-            const cloudResult = await neonPool.query(insertUserQuery, userParams);
+            const cloudResult = await pool.query(insertUserQuery, userParams);
             cloudNewUser = cloudResult.rows[0];
             cloudSuccess = true;
         } catch (error) {
@@ -158,7 +157,7 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
             const welcomeMessage = `Jai Swaminarayan ${cloudNewUser.full_name}, your account has been successfully created.`;
 
             try {
-                await neonPool.query(insertNotifQuery, [
+                await pool.query(insertNotifQuery, [
                     cloudNewUser.id,
                     cloudNewUser.department_id || 0,
                     welcomeSubject,
@@ -207,11 +206,11 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
             const alertMessage = `New ${cloudNewUser.role} account has been created: ${cloudNewUser.full_name} (${cloudNewUser.username})`;
 
             try {
-                const managementResult = await neonPool.query(adminTargetQuery, [cloudNewUser.id]);
+                const managementResult = await pool.query(adminTargetQuery, [cloudNewUser.id]);
 
                 for (const manager of managementResult.rows) {
                     try {
-                        await neonPool.query(insertNotifQuery, [
+                        await pool.query(insertNotifQuery, [
                             manager.id,
                             manager.department_id || 0,
                             alertSubject,
@@ -236,7 +235,7 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
         } catch { }
 
         try {
-            await neonPool.query(deleteRequestQuery, [finalSuid]);
+            await pool.query(deleteRequestQuery, [finalSuid]);
         } catch { }
 
         const responseUser = localNewUser || cloudNewUser;
@@ -290,7 +289,7 @@ export const deleteRequestBySuid = async (req: Request, res: Response): Promise<
         } catch { }
 
         try {
-            await neonPool.query(deleteQuery, [suid]);
+            await pool.query(deleteQuery, [suid]);
         } catch { }
 
         return res.status(200).json({ success: true, message: "Purged" });
@@ -410,7 +409,7 @@ export const updateUser = async (req: Request, res: Response): Promise<any> => {
         }
 
         try {
-            const cloudResult = await neonPool.query(updateUserQuery, userParams);
+            const cloudResult = await pool.query(updateUserQuery, userParams);
             if (!updatedUser) updatedUser = cloudResult.rows[0];
             cloudSuccess = true;
         } catch (error) {
@@ -473,8 +472,8 @@ export const deleteUser = async (req: Request, res: Response): Promise<any> => {
         }
 
         try {
-            await neonPool.query(deleteNotifQuery, [id]);
-            const cloudResult = await neonPool.query(deleteUserQuery, [id]);
+            await pool.query(deleteNotifQuery, [id]);
+            const cloudResult = await pool.query(deleteUserQuery, [id]);
             if (!deletedUser) deletedUser = cloudResult.rows[0];
             cloudSuccess = true;
         } catch (error) {

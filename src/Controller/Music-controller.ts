@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import db from "../database/db.js";
+import pool from "../database/start";
 
 // ક્લાઉડિનરી લિંક મેળવવા માટેનું હેલ્પર
 const getFileUrl = (file?: Express.Multer.File) => {
@@ -10,7 +10,7 @@ const getFileUrl = (file?: Express.Multer.File) => {
 // 1. GET: Fetch All Active Songs
 export const getAllSongs = async (_req: Request, res: Response) => {
     try {
-        const result = await db.query(
+        const result = await pool.query(
             "SELECT id, title, artist, audio_url FROM gurukul_songs WHERE is_active = true ORDER BY id DESC"
         );
         return res.status(200).json({ success: true, songs: result.rows });
@@ -43,7 +43,7 @@ export const uploadSong = async (req: Request, res: Response) => {
 
         const audioUrl = getFileUrl(audioFile);
 
-        const result = await db.query(
+        const result = await pool.query(
             `INSERT INTO gurukul_songs (title, artist, audio_url, is_active) 
              VALUES ($1, $2, $3, true) 
              RETURNING id, title, artist, audio_url`,
@@ -74,7 +74,7 @@ export const uploadSong = async (req: Request, res: Response) => {
 export const deleteSong = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const result = await db.query("DELETE FROM gurukul_songs WHERE id = $1 RETURNING id", [id]);
+        const result = await pool.query("DELETE FROM gurukul_songs WHERE id = $1 RETURNING id", [id]);
 
         if (result.rowCount === 0) {
             return res.status(404).json({ success: false, message: "Track not found" });

@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
-import pool from '../database/db.js';
-import neonPool from '../database/neon.js';
+import pool from '../database/start.js';
 
 export const createGurukulArtRequest = async (req: Request, res: Response): Promise<any> => {
     try {
@@ -29,8 +28,6 @@ export const createGurukulArtRequest = async (req: Request, res: Response): Prom
             localSuccess = true;
         } catch (err) { console.error(err); }
         try {
-            const cloudResult = await neonPool.query(insertQuery, queryParams);
-            if (!newRequest) newRequest = cloudResult.rows[0];
             cloudSuccess = true;
         } catch (err) { console.error(err); }
         if (!localSuccess && !cloudSuccess) {
@@ -50,7 +47,7 @@ export const getGurukulArtRequests = async (req: Request, res: Response): Promis
         `;
         let requestsList = [];
         try { requestsList = (await pool.query(selectQuery)).rows; } catch (err) {
-            requestsList = (await neonPool.query(selectQuery)).rows;
+            console.error("Error fetching Gurukul Art requests:", err);
         }
         return res.status(200).json({ success: true, requests: requestsList });
     } catch (error) {
@@ -65,7 +62,7 @@ export const getOnboardedGurukulArtUsers = async (req: Request, res: Response): 
             FROM users WHERE department_id = 2 ORDER BY id DESC;
         `;
         let rows = [];
-        try { rows = (await pool.query(query)).rows; } catch (err) { rows = (await neonPool.query(query)).rows; }
+        try { rows = (await pool.query(query)).rows; } catch (err) { console.error("Error fetching onboarded Gurukul Art users:", err); }
         return res.status(200).json({ success: true, users: rows });
     } catch (error) {
         return res.status(500).json({ success: false, message: 'Server error' });
@@ -84,7 +81,7 @@ export const approveGurukulArtRequest = async (req: Request, res: Response): Pro
         const updateQuery = `UPDATE admit_requests SET status = 'Approved' WHERE id = $1 AND department_id = 2 RETURNING id, name, status;`;
         let updatedRow = null;
         try { updatedRow = (await pool.query(updateQuery, [id])).rows[0]; }
-        catch (err) { updatedRow = (await neonPool.query(updateQuery, [id])).rows[0]; }
+        catch (err) { console.error("Error updating Gurukul Art request:", err); }
         if (!updatedRow) return res.status(404).json({ success: false, message: "રિક્વેસ્ટ મળી નથી." });
         return res.status(200).json({ success: true, message: `Gurukul Art Request Approved! ✅`, data: updatedRow });
     } catch (error) {
@@ -104,7 +101,7 @@ export const declineGurukulArtRequest = async (req: Request, res: Response): Pro
         const updateQuery = `UPDATE admit_requests SET status = 'Declined' WHERE id = $1 AND department_id = 2 RETURNING id, name, status;`;
         let updatedRow = null;
         try { updatedRow = (await pool.query(updateQuery, [id])).rows[0]; }
-        catch (err) { updatedRow = (await neonPool.query(updateQuery, [id])).rows[0]; }
+        catch (err) { console.error("Error declining Gurukul Art request:", err); }
         if (!updatedRow) return res.status(404).json({ success: false, message: "રિક્વેસ્ટ મળી નથી." });
         return res.status(200).json({ success: true, message: `Gurukul Art Request Declined! ❌`, data: updatedRow });
     } catch (error) {

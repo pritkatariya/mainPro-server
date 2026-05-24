@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import pool from "../database/db.js";
-import neonPool from "../database/neon.js";
+import pool from "../database/start.js";
 
 export const login = async (req: Request, res: Response) => {
     const { username, password } = req.body;
@@ -17,7 +16,7 @@ export const login = async (req: Request, res: Response) => {
         try {
             user = (await pool.query(queryText, [username])).rows[0];
         } catch (e) {
-            user = (await neonPool.query(queryText, [username])).rows[0];
+            console.error("Error fetching user:", e);
         }
 
         if (user) {
@@ -46,7 +45,8 @@ export const getAllDepartments = async (_req: Request, res: Response): Promise<a
         try {
             rows = (await pool.query(queryText)).rows;
         } catch (e) {
-            rows = (await neonPool.query(queryText)).rows;
+            console.error("Error fetching departments:", e);
+            rows = [];
         }
 
         const formattedDepartments = rows.map((dept: any) => ({
@@ -83,7 +83,7 @@ export const handleForgotPasswordRequest = async (req: Request, res: Response): 
         try {
             await pool.query(insertQuery, params);
         } catch (e) {
-            await neonPool.query(insertQuery, params);
+            console.error("Error inserting forgot password request:", e);
         }
 
         const notifTitle = `New Account Request: ${subject}`;
@@ -100,7 +100,8 @@ export const handleForgotPasswordRequest = async (req: Request, res: Response): 
         try {
             headUser = (await pool.query(findHeadQuery, [verifiedUserTargetDept])).rows[0];
         } catch (e) {
-            headUser = (await neonPool.query(findHeadQuery, [verifiedUserTargetDept])).rows[0];
+            console.error("Error fetching department head:", e);
+            headUser = null;
         }
 
         const insertNotifQuery = `
@@ -111,20 +112,27 @@ export const handleForgotPasswordRequest = async (req: Request, res: Response): 
         if (headUser) {
             try {
                 await pool.query(insertNotifQuery, [headUser.id, notifTitle, notifMessage]);
-            } catch (e) {}
+            } catch (e) {
+                console.error("Error inserting notification:", e);
+            }
 
             try {
-                await neonPool.query(insertNotifQuery, [headUser.id, notifTitle, notifMessage]);
-            } catch (e) {}
+            } catch (e) {
+                console.error("Error inserting notification:", e);
+            }
         }
 
         try {
             await pool.query(insertNotifQuery, [123098, notifTitle, notifMessage]);
-        } catch (e) {}
+        } catch (e) {
+            console.error("Error inserting notification:", e);
+        }
 
         try {
-            await neonPool.query(insertNotifQuery, [123098, notifTitle, notifMessage]);
-        } catch (e) {}
+            await pool.query(insertNotifQuery, [123098, notifTitle, notifMessage]);
+        } catch (e) {
+            console.error("Error inserting notification:", e);
+        }
 
         return res.status(201).json({
             success: true,
