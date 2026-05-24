@@ -1,10 +1,20 @@
 import { Request, Response } from "express";
 import pool from "../database/start.js";
+import { uploadToSupabase } from "../middleware/upload.js";
 
-// ક્લાઉડિનરી લિંક મેળવવા માટેનું હેલ્પર
+// Helper to obtain a usable file URL from different upload adapters (multer disk, cloudinary, S3, etc.)
 const getFileUrl = (file?: Express.Multer.File) => {
     if (!file) return "";
-    return file.path; // Cloudinary આપણને ડાયરેક્ટ secure https:// યુઆરએલ આપે છે
+    // Different upload middlewares/providers put the final URL in different props.
+    // Try common ones in order of preference and fall back to `path` or empty string.
+    const f: any = file as any;
+    return (
+        f.secure_url || // Cloudinary
+        f.location ||   // multer-s3 / S3
+        f.url ||
+        f.path ||
+        ""
+    );
 };
 
 // 1. GET: Fetch All Active Songs
@@ -41,7 +51,22 @@ export const uploadSong = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, message: "Song title/naam is required" });
         }
 
-        const audioUrl = getFileUrl(audioFile);
+        let audioUrl = getFileUrl(audioFile);
+
+        // If multer is using memoryStorage (we have buffer), upload to Supabase storage and get a public URL
+        if ((!audioUrl || audioUrl === "") && (audioFile as any)?.buffer) {
+            try {
+                audioUrl = await uploadToSupabase(audioFile as Express.Multer.File, "gurukul_assets");
+            } catch (err) {
+                console.error("Supabase upload failed:", err);
+                return res.status(500).json({ success: false, message: "Failed to store uploaded file in cloud storage" });
+            }
+        }
+
+        if (!audioUrl) {
+            console.error("Upload completed but no audio URL was derived from the uploaded file:", audioFile);
+            return res.status(500).json({ success: false, message: "Upload succeeded but no file URL returned by storage provider" });
+        }
 
         const result = await pool.query(
             `INSERT INTO gurukul_songs (title, artist, audio_url, is_active) 

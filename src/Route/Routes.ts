@@ -5,6 +5,7 @@ import * as RoleController from "../Controller/Role-controller.js";
 import * as GMusicController from "../Controller/Gmusic-controller.js";
 import * as ArtController from "../Controller/Art-controller.js";
 import * as ApplicationController from "../Controller/Application-controller.js";
+import * as NotificationController from "../Controller/Notification-controller.js";
 import {
     getAllSongs,
     uploadSong,
@@ -61,6 +62,8 @@ router.post("/gurukul-art/admit-request/decline/:id",ArtController.declineGuruku
 router.get("/student/get-filtered-notifications",ApplicationController.getAllApplications);
 router.put("/student/notification/status-update/:id", ApplicationController.updateApplicationStatus);
 router.delete("/student/notification/delete/:id",ApplicationController.deleteApplication);
+router.put("/student/notification/mark-read/:id", NotificationController.markNotificationRead);
+router.put("/student/notification/mark-all-read/:userId", NotificationController.markAllNotificationsReadForUser);
 
 router.post("/amrut-images",upload.single("image"),CreateData);
 router.get("/amrut-images",GetAllData);
