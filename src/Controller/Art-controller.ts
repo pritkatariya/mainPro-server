@@ -58,7 +58,7 @@ export const getGurukulArtRequests = async (req: Request, res: Response): Promis
 export const getOnboardedGurukulArtUsers = async (req: Request, res: Response): Promise<any> => {
     try {
         const query = `
-            SELECT id, full_name as name, username, profile_image_url as image_url, department_id, joined_date 
+            SELECT id, full_name as name, username, suid, profile_image_url as image_url, role, department_id, joined_date 
             FROM users WHERE department_id = 2 ORDER BY id DESC;
         `;
         let rows = [];

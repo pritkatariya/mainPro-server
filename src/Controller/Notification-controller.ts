@@ -274,3 +274,44 @@ export const deleteNotification = async (req: Request, res: Response): Promise<a
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
+
+export const markNotificationRead = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const idParam = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        const numericId = parseInt(String(idParam), 10);
+
+        if (isNaN(numericId)) {
+            return res.status(400).json({ success: false, message: "Invalid ID format" });
+        }
+
+        const update = await executeQuery(
+            "UPDATE user_notifications SET is_read = true WHERE id = $1 RETURNING *",
+            [numericId]
+        );
+
+        if (update.rowCount === 0) {
+            return res.status(404).json({ success: false, message: "Notification not found" });
+        }
+
+        return res.status(200).json({ success: true, message: "Marked as read", data: update.rows[0] });
+    } catch (error) {
+        console.error("Mark read error:", error);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
+};
+
+export const markAllNotificationsReadForUser = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const userId = req.params.userId ? parseInt(String(req.params.userId), 10) : NaN;
+        if (isNaN(userId)) {
+            return res.status(400).json({ success: false, message: "Invalid user id" });
+        }
+
+        await executeQuery("UPDATE user_notifications SET is_read = true WHERE user_id = $1", [userId]);
+
+        return res.status(200).json({ success: true, message: "All notifications marked as read" });
+    } catch (error) {
+        console.error("Mark all read error:", error);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
+};

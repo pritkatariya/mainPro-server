@@ -27,7 +27,6 @@ export const createGMusicRequest = async (req: Request, res: Response): Promise<
 
         let newRequest = null;
         let localSuccess = false;
-        let cloudSuccess = false;
 
         try {
             const result = await pool.query(insertQuery, queryParams);
@@ -37,15 +36,7 @@ export const createGMusicRequest = async (req: Request, res: Response): Promise<
             console.error(err);
         }
 
-        try {
-            const cloudResult = await pool.query(insertQuery, queryParams);
-            if (!newRequest) newRequest = cloudResult.rows[0];
-            cloudSuccess = true;
-        } catch (err) {
-            console.error(err);
-        }
-
-        if (!localSuccess && !cloudSuccess) {
+        if (!localSuccess) {
             return res.status(500).json({ success: false, message: "Error submitting G-Music application." });
         }
 
@@ -84,7 +75,7 @@ export const getGMusicRequests = async (_req: Request, res: Response): Promise<a
 export const getOnboardedGMusicUsers = async (_req: Request, res: Response): Promise<any> => {
     try {
         const query = `
-            SELECT id, full_name as name, username, suid, profile_image_url as image_url, department_id, joined_date 
+            SELECT id, full_name as name, username, suid, profile_image_url as image_url, role, department_id, joined_date 
             FROM users WHERE department_id = 1 ORDER BY id DESC;
         `;
 

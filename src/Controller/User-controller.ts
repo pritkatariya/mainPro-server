@@ -96,9 +96,7 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
         ];
 
         let localNewUser: any = null;
-        let cloudNewUser: any = null;
         let localSuccess = false;
-        let cloudSuccess = false;
 
         try {
             const result = await pool.query(insertUserQuery, userParams);
@@ -109,25 +107,14 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
             console.error("Local user insert error:", error);
         }
 
-        try {
-            const cloudResult = await pool.query(insertUserQuery, userParams);
-            cloudNewUser = cloudResult.rows[0];
-            cloudSuccess = true;
-        } catch (error) {
-            cloudInsertError = error;
-            console.error("Cloud user insert error:", error);
-        }
-
-        if (!localSuccess && !cloudSuccess) {
+        if (!localSuccess) {
             const localMsg =
                 localInsertError instanceof Error ? localInsertError.message : String(localInsertError);
-            const cloudMsg =
-                cloudInsertError instanceof Error ? cloudInsertError.message : String(cloudInsertError);
 
             return res.status(500).json({
                 success: false,
                 message: "Failed to insert user.",
-                detail: localMsg || cloudMsg,
+                detail: localMsg,
             });
         }
 
@@ -150,21 +137,6 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
                 ]);
             } catch (error) {
                 console.error("Local welcome notification error:", error);
-            }
-        }
-
-        if (cloudSuccess && cloudNewUser) {
-            const welcomeMessage = `Jai Swaminarayan ${cloudNewUser.full_name}, your account has been successfully created.`;
-
-            try {
-                await pool.query(insertNotifQuery, [
-                    cloudNewUser.id,
-                    cloudNewUser.department_id || 0,
-                    welcomeSubject,
-                    welcomeMessage,
-                ]);
-            } catch (error) {
-                console.error("Cloud welcome notification error:", error);
             }
         }
 
@@ -202,29 +174,6 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
             }
         }
 
-        if (cloudSuccess && cloudNewUser) {
-            const alertMessage = `New ${cloudNewUser.role} account has been created: ${cloudNewUser.full_name} (${cloudNewUser.username})`;
-
-            try {
-                const managementResult = await pool.query(adminTargetQuery, [cloudNewUser.id]);
-
-                for (const manager of managementResult.rows) {
-                    try {
-                        await pool.query(insertNotifQuery, [
-                            manager.id,
-                            manager.department_id || 0,
-                            alertSubject,
-                            alertMessage,
-                        ]);
-                    } catch (error) {
-                        console.error("Cloud admin notification error:", error);
-                    }
-                }
-            } catch (error) {
-                console.error("Cloud admin query error:", error);
-            }
-        }
-
         const deleteRequestQuery = `
             DELETE FROM admit_requests 
             WHERE TRIM(suid) = TRIM($1);
@@ -234,11 +183,7 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
             await pool.query(deleteRequestQuery, [finalSuid]);
         } catch { }
 
-        try {
-            await pool.query(deleteRequestQuery, [finalSuid]);
-        } catch { }
-
-        const responseUser = localNewUser || cloudNewUser;
+        const responseUser = localNewUser;
 
         return res.status(201).json({
             success: true,
