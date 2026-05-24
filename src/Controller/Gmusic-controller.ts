@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
-import pool from "../database/db.js";
-import neonPool from "../database/neon.js";
+import pool from "../database/start.js";
 
 export const createGMusicRequest = async (req: Request, res: Response): Promise<any> => {
     try {
@@ -39,7 +38,7 @@ export const createGMusicRequest = async (req: Request, res: Response): Promise<
         }
 
         try {
-            const cloudResult = await neonPool.query(insertQuery, queryParams);
+            const cloudResult = await pool.query(insertQuery, queryParams);
             if (!newRequest) newRequest = cloudResult.rows[0];
             cloudSuccess = true;
         } catch (err) {
@@ -47,7 +46,7 @@ export const createGMusicRequest = async (req: Request, res: Response): Promise<
         }
 
         if (!localSuccess && !cloudSuccess) {
-            return res.status(500).json({ success: false, message: "ಡೇಟಾಬೇಸ ઇન્સર્ટ ફેલ થયો છે." });
+            return res.status(500).json({ success: false, message: "Error submitting G-Music application." });
         }
 
         return res.status(201).json({
@@ -72,7 +71,8 @@ export const getGMusicRequests = async (_req: Request, res: Response): Promise<a
         try {
             requestsList = (await pool.query(selectQuery)).rows;
         } catch (err) {
-            requestsList = (await neonPool.query(selectQuery)).rows;
+            console.error("Error fetching G-Music requests:", err);
+            requestsList = [];
         }
 
         return res.status(200).json({ success: true, requests: requestsList });
@@ -93,7 +93,8 @@ export const getOnboardedGMusicUsers = async (_req: Request, res: Response): Pro
         try {
             rows = (await pool.query(query)).rows;
         } catch (err) {
-            rows = (await neonPool.query(query)).rows;
+            console.error("Error fetching onboarded G-Music users:", err);
+            rows = [];
         }
 
         return res.status(200).json({ success: true, users: rows });
@@ -134,7 +135,8 @@ export const approveGMusicRequest = async (req: Request, res: Response): Promise
         try {
             updatedRow = (await pool.query(updateQuery, [id])).rows[0];
         } catch (err) {
-            updatedRow = (await neonPool.query(updateQuery, [id])).rows[0];
+            console.error("Error updating G-Music request:", err);
+            updatedRow = null;
         }
 
         if (!updatedRow) {
@@ -183,7 +185,8 @@ export const declineGMusicRequest = async (req: Request, res: Response): Promise
         try {
             updatedRow = (await pool.query(updateQuery, [id])).rows[0];
         } catch (err) {
-            updatedRow = (await neonPool.query(updateQuery, [id])).rows[0];
+            console.error("Error declining G-Music request:", err);
+            updatedRow = null;
         }
 
         if (!updatedRow) {

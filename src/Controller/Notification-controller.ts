@@ -1,13 +1,13 @@
 import { Request, Response } from "express";
-import pool from "../database/db.js";
-import neonPool from "../database/neon.js";
+import pool from "../database/start.js";
 import bcrypt from "bcrypt";
 
 const executeQuery = async (text: string, params: any[] = []) => {
     try {
         return await pool.query(text, params);
     } catch (error) {
-        return await neonPool.query(text, params);
+        console.error("Database query error:", error);
+        throw error;
     }
 };
 

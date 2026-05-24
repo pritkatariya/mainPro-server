@@ -1,8 +1,7 @@
 import { Request, Response } from "express";
-import pool from "../database/db.js";
-import neonPool from "../database/neon.js";
+import pool from "../database/start.js";
 
-const getDb = () => (process.env.NODE_ENV === "production" ? neonPool : pool);
+const getDb = () => (process.env.NODE_ENV === "production" ?  pool : pool);
 
 const parsePermissions = (permissions: any) => {
     if (!permissions) return {};
@@ -121,7 +120,7 @@ export const GetRoleById = async (req: Request, res: Response): Promise<any> => 
             WHERE id = $1;
         `;
 
-        const db = process.env.NODE_ENV === "production" ? neonPool : pool;
+        const db = process.env.NODE_ENV === "production" ? pool : pool;
         const result = await db.query(query, [id]);
 
         if (result.rows.length === 0) {

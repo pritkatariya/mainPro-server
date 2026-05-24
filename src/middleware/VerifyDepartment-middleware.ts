@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import pool from '../database/db.js';
-import neonPool from '../database/neon.js';
+import pool from '../database/start.js';
 
 export const verifyDepartmentAssignment = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     const { department_name, suid, username } = req.body;
@@ -15,7 +14,7 @@ export const verifyDepartmentAssignment = async (req: Request, res: Response, ne
         try {
             deptRows = (await pool.query(deptQuery, [department_name])).rows;
         } catch (e) {
-            deptRows = (await neonPool.query(deptQuery, [department_name])).rows;
+            deptRows = (await pool.query(deptQuery, [department_name])).rows;
         }
 
         if (deptRows.length === 0) {
@@ -33,19 +32,19 @@ export const verifyDepartmentAssignment = async (req: Request, res: Response, ne
         try {
             userRows = (await pool.query(userQuery, [suid, username, department_id])).rows;
         } catch (e) {
-            userRows = (await neonPool.query(userQuery, [suid, username, department_id])).rows;
+            userRows = (await pool.query(userQuery, [suid, username, department_id])).rows;
         }
 
         if (userRows.length === 0) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Warning: Invalid assignment! This SUID/Username is not registered under the selected department.' 
+            return res.status(400).json({
+                success: false,
+                message: 'Warning: Invalid assignment! This SUID/Username is not registered under the selected department.'
             });
         }
 
         req.body.validatedUserId = userRows[0].id;
         req.body.validatedDepartmentId = department_id;
-        
+
         next();
     } catch (error) {
         console.error('Middleware validation error:', error);

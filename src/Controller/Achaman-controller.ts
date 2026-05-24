@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as AchamanService from "../services/AchamanService.js";
+import * as AchamanService from "../services/Achaman-Service.js";
 
 // Helper to handle params type error
 const getId = (req: Request) => req.params.id as string;
