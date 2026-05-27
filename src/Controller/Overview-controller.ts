@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import pool from "../database/start.js";
-import { uploadToSupabase } from "../middleware/upload.js";
+import { uploadToCloudinary } from "../middleware/upload.js";
 import * as OverviewSevice from "../services/Overview-Servise.js";
 
 interface OverviewConfig {
@@ -91,24 +91,24 @@ export const updateOverviewConfig = async (req: Request, res: Response): Promise
 
         // ૨. નવી ફાઇલ્સ અપલોડ કરો
         const newHeroUrls = reqFiles?.heroImages 
-            ? await Promise.all(reqFiles.heroImages.map(file => uploadToSupabase(file))) 
+            ? await Promise.all(reqFiles.heroImages.map(file => uploadToCloudinary(file))) 
             : [];
 
         const newCampusGalleryUrls = reqFiles?.campusGalleryImages 
-            ? await Promise.all(reqFiles.campusGalleryImages.map(file => uploadToSupabase(file))) 
+            ? await Promise.all(reqFiles.campusGalleryImages.map(file => uploadToCloudinary(file))) 
             : [];
 
         const newDailyDarshanUrls = reqFiles?.dailyDarshanImages 
-            ? await Promise.all(reqFiles.dailyDarshanImages.slice(0, 10).map(file => uploadToSupabase(file))) 
+            ? await Promise.all(reqFiles.dailyDarshanImages.slice(0, 10).map(file => uploadToCloudinary(file))) 
             : [];
 
         // ૩. ઈમેજ લોજિક
         let logoImage = reqFiles?.logoImage?.[0] 
-            ? await uploadToSupabase(reqFiles.logoImage[0]) 
+            ? await uploadToCloudinary(reqFiles.logoImage[0]) 
             : (req.body.logoImage ?? current.logoImage);
 
         let campusImage = reqFiles?.campusImage?.[0] 
-            ? await uploadToSupabase(reqFiles.campusImage[0]) 
+            ? await uploadToCloudinary(reqFiles.campusImage[0]) 
             : (req.body.campusImage ?? current.campusImage);
 
         // ૪. એરે કમ્બાઈન કરો

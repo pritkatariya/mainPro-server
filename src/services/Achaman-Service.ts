@@ -1,4 +1,4 @@
-import { uploadToSupabase } from "../middleware/upload.js";
+import { uploadToCloudinary } from "../middleware/upload.js";
 import pool from "../database/start.js";
 
 export const getAllImages = async () => {
@@ -10,7 +10,7 @@ export const getSingleImage = async (id: string) => {
 };
 
 export const createNewImage = async (title: string, imageFile: any) => {
-    const imageUrl = await uploadToSupabase(imageFile);
+    const imageUrl = await uploadToCloudinary(imageFile);
     const query = "INSERT INTO amrut_images (title, url, created_at) VALUES ($1, $2, NOW()) RETURNING *";
     return await pool.query(query, [title.trim(), imageUrl]);
 };
@@ -22,7 +22,7 @@ export const deleteImage = async (id: string) => {
 export const updateImage = async (id: string, title: string, imageFile: any, existingData: any) => {
     let imageUrl = existingData.url;
     if (imageFile) {
-        imageUrl = await uploadToSupabase(imageFile);
+        imageUrl = await uploadToCloudinary(imageFile);
     }
     const query = "UPDATE amrut_images SET title = $1, url = $2 WHERE id = $3 RETURNING *";
     return await pool.query(query, [title || existingData.title, imageUrl, id]);
