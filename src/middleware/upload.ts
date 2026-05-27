@@ -1,19 +1,22 @@
 import { Request } from "express";
 import multer from "multer";
-import { createClient } from "@supabase/supabase-js";
+import { v2 as cloudinary, UploadApiErrorResponse, UploadApiResponse } from "cloudinary";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const supabaseUrl = process.env.SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+// 🌐 Cloudinary Configuration
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
+    api_key: process.env.CLOUDINARY_API_KEY || "",
+    api_secret: process.env.CLOUDINARY_API_SECRET || "",
+});
 
-if (!supabaseUrl || !supabaseKey) {
-    console.error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing in .env file!");
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    console.error("Missing Cloudinary credentials in .env file!");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
-
+// 💾 Multer Memory Storage Config
 const storage = multer.memoryStorage();
 
 const fileFilter = (
@@ -43,38 +46,52 @@ export const upload = multer({
     storage,
     fileFilter,
     limits: {
-        fileSize: 50 * 1024 * 1024,
+        fileSize: 50 * 1024 * 1024, // 50MB Limit
         files: 20,
     },
 });
 
-export const uploadToSupabase = async (
+/**
+ * 🚀 Uploads a file buffer directly to Cloudinary
+ * @param file - Multer file object containing the buffer
+ * @param folder - Cloudinary folder name (defaults to "gurukul_assets")
+ * @returns Secure URL string from Cloudinary
+ */
+export const uploadToCloudinary = async (
     file: Express.Multer.File,
-    bucket: string = "gurukul_assets"
+    folder: string = "gurukul_assets"
 ): Promise<string> => {
-    const cleanName = file.originalname
-        .split(".")[0]
-        .replace(/[^a-zA-Z0-9]/g, "-")
-        .toLowerCase();
+    return new Promise((resolve, reject) => {
+        const cleanName = file.originalname
+            .split(".")[0]
+            .replace(/[^a-zA-Z0-9]/g, "-")
+            .toLowerCase();
+            
+        const uniqueFilename = `${Date.now()}-${cleanName}`;
 
-    const fileExtension = file.originalname.split(".").pop();
-    const fileName = `${Date.now()}-${cleanName}.${fileExtension}`;
+        // 🛠️ upload_stream નો ઉપયોગ બફર ડેટા અપલોડ કરવા માટે
+        const uploadStream = cloudinary.uploader.upload_stream(
+            {
+                folder: folder,
+                public_id: uniqueFilename,
+                resource_type: "auto", // ઈમેજ અને ઓડિયો બંને ઓટોમેટિક હેન્ડલ કરશે
+            },
+            // 🔒 FIXED TYPE: અહીંયા પ્રોપર ક્લાઉડિનરી ટાઇપ્સ ડિફાઇન કરી દીધી છે
+            (error: UploadApiErrorResponse | undefined, result: UploadApiResponse | undefined) => {
+                if (error) {
+                    console.error("Cloudinary Upload Error:", error);
+                    return reject(new Error(`Cloudinary upload failed: ${error.message}`));
+                }
+                if (!result) {
+                    return reject(new Error("Cloudinary upload failed: No result returned from server."));
+                }
+                
+                // 🔗 સિક્યોર HTTPS URL રિટર્ન કરશે
+                resolve(result.secure_url);
+            }
+        );
 
-    const { error } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file.buffer, {
-            contentType: file.mimetype,
-            upsert: true,
-        });
-
-    if (error) {
-        console.error("Supabase Upload Error:", error);
-        throw new Error(`Supabase upload failed: ${error.message}`);
-    }
-
-    const { data: publicUrlData } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(fileName);
-
-    return publicUrlData.publicUrl;
+        // બફરને સ્ટ્રીમમાં રાઇટ કરીને અપલોડ પ્રોસેસ સ્ટાર્ટ કરવી
+        uploadStream.end(file.buffer);
+    });
 };

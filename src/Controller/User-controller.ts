@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import pool from "../database/start.js";
 import bcrypt from "bcrypt";
-import { uploadToSupabase } from "../middleware/upload.js";
+import { uploadToCloudinary } from "../middleware/upload.js";
 
 const executeQuery = async (text: string, params: any[] = []) => {
     try {
@@ -61,7 +61,7 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
         let profileImageUrl = existingImageUrl || null;
 
         if (req.file) {
-            profileImageUrl = await uploadToSupabase(req.file);
+            profileImageUrl = await uploadToCloudinary(req.file);
         }
 
         const salt = await bcrypt.genSalt(10);
@@ -274,7 +274,7 @@ export const getUserLiveNotifications = async (req: Request, res: Response): Pro
 export const updateUser = async (req: Request, res: Response): Promise<any> => {
     try {
         const { id } = req.params;
-        const { fullName, username, password, std, rollNumber, suid, userRole, department } = req.body;
+        const { fullName, username, password, std, rollNumber, suid, userRole, department, sectionId } = req.body;
 
         if (!id) {
             return res.status(400).json({
@@ -302,7 +302,7 @@ export const updateUser = async (req: Request, res: Response): Promise<any> => {
         let profileImageUrl: string | null = null;
 
         if (req.file) {
-            profileImageUrl = await uploadToSupabase(req.file);
+            profileImageUrl = await uploadToCloudinary(req.file);
         }
 
         let hashedPassword = null;
@@ -314,17 +314,18 @@ export const updateUser = async (req: Request, res: Response): Promise<any> => {
 
         const updateUserQuery = `
             UPDATE users SET
-                full_name = COALESCE($1, full_name),
-                username = COALESCE($2, username),
-                password = COALESCE($3, password),
-                std = COALESCE($4, std),
-                roll_number = COALESCE($5, roll_number),
-                role = COALESCE($6, role),
-                department_id = COALESCE($7, department_id),
-                profile_image_url = COALESCE($8, profile_image_url),
-                suid = COALESCE($9, suid),
-                updated_at = NOW()
-            WHERE id = $10
+            full_name = COALESCE($1, full_name),
+            username = COALESCE($2, username),
+            password = COALESCE($3, password),
+            std = COALESCE($4, std),
+            roll_number = COALESCE($5, roll_number),
+            role = COALESCE($6, role),
+            department_id = COALESCE($7, department_id),
+            profile_image_url = COALESCE($8, profile_image_url),
+            suid = COALESCE($9, suid),
+            section_id = COALESCE($10, section_id), -- 👈 આ નવી લાઈન
+            updated_at = NOW()
+            WHERE id = $11 -- 👈 આ $11 થઈ ગયું
             RETURNING id, full_name, username, role, department_id, suid, profile_image_url;
         `;
 
@@ -338,7 +339,8 @@ export const updateUser = async (req: Request, res: Response): Promise<any> => {
             department ? Number(department) : null,
             profileImageUrl,
             suid || null,
-            id,
+            sectionId ? Number(sectionId) : null, // 👈 આ $10 તરીકે એડ થયું
+            id, // 👈 આ $11 થઈ ગયું
         ];
 
         let updatedUser = null;
