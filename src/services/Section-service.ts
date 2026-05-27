@@ -18,12 +18,20 @@ export const SectionService = {
     },
 
     getSectionsByDepartment: async (dept_id: number) => {
+        console.log('[SectionService] getSectionsByDepartment called with dept_id:', dept_id);
+        
+        // dept_id valid check
+        if (!dept_id || isNaN(dept_id)) {
+            throw new Error(`Invalid dept_id: ${dept_id}`);
+        }
+
         const query = `
             SELECT * FROM sections 
             WHERE department_id = $1 
             ORDER BY id ASC;
         `;
         const result = await pool.query(query, [dept_id]);
+        console.log('[SectionService] rows found:', result.rows.length);
         return result.rows;
     },
 
@@ -49,5 +57,4 @@ export const SectionService = {
         const result = await pool.query(query, [users_id]);
         return result.rows;
     }
-    
 };

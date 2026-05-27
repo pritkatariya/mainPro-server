@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { SectionService } from "../services/Section-service.js"; 
+import { SectionService } from "../services/Section-service.js";
 import pool from "../database/start.js";
 
 export const createSection = async (req: Request, res: Response): Promise<void> => {
@@ -29,15 +29,23 @@ export const createSection = async (req: Request, res: Response): Promise<void> 
 export const getSections = async (req: Request, res: Response): Promise<void> => {
     try {
         const { dept_id } = req.query;
+        console.log('[getSections] dept_id received:', dept_id);
 
         if (!dept_id) {
             res.status(400).json({ message: "Department ID (dept_id) query param is required." });
             return;
         }
 
-        const sections = await SectionService.getSectionsByDepartment(Number(dept_id));
+        const parsedId = Number(dept_id);
+        if (isNaN(parsedId)) {
+            res.status(400).json({ message: "dept_id must be a valid number." });
+            return;
+        }
+
+        const sections = await SectionService.getSectionsByDepartment(parsedId);
         res.status(200).json({ success: true, data: sections });
     } catch (error: any) {
+        console.error('[getSections] ERROR:', error.message);
         res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
     }
 };
@@ -63,7 +71,7 @@ export const getSectionMembersList = async (req: Request, res: Response): Promis
     try {
         const { users_id } = req.query;
         const ids = users_id ? String(users_id).split(',').map(Number) : [];
-        
+
         const members = await SectionService.getSectionMembersDetails(ids);
         res.status(200).json({ success: true, data: members });
     } catch (error: any) {
