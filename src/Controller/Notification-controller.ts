@@ -1,15 +1,6 @@
 import { Request, Response } from "express";
-import pool from "../database/start.js";
 import bcrypt from "bcrypt";
-
-const executeQuery = async (text: string, params: any[] = []) => {
-    try {
-        return await pool.query(text, params);
-    } catch (error) {
-        console.error("Database query error:", error);
-        throw error;
-    }
-};
+import * as notificationService from "../services/Notification-service.js"; 
 
 const normalizeRole = (role: unknown) => String(role || "").trim().toLowerCase();
 
@@ -23,6 +14,7 @@ const isHeadRole = (role: unknown) => {
     return roleCode === "department main" || roleCode === "department_main" || roleCode === "head1029";
 };
 
+// ૧. Create Password Reset Notification
 export const createPasswordResetNotification = async (req: Request, res: Response): Promise<any> => {
     try {
         const { validatedUserId, validatedDepartmentId, subject, message } = req.body;
@@ -34,24 +26,17 @@ export const createPasswordResetNotification = async (req: Request, res: Respons
             });
         }
 
-        const insertQuery = `
-            INSERT INTO user_notifications 
-            (user_id, department_id, title, message, head_approved, admin_approved, notification_type)
-            VALUES ($1, $2, $3, $4, NULL, NULL, 'password_reset')
-            RETURNING *;
-        `;
-
-        const result = await executeQuery(insertQuery, [
+        const newNotification = await notificationService.createNotificationService(
             Number(validatedUserId),
             Number(validatedDepartmentId),
             subject,
-            message,
-        ]);
+            message
+        );
 
         return res.status(201).json({
             success: true,
             message: "Application submitted successfully to your Department Head for verification.",
-            data: result.rows[0],
+            data: newNotification,
         });
     } catch (error) {
         console.error("Create application error:", error);
@@ -59,16 +44,20 @@ export const createPasswordResetNotification = async (req: Request, res: Respons
     }
 };
 
+// ૨. Get Filtered Notifications
 export const getFilteredNotifications = async (req: Request, res: Response): Promise<any> => {
     try {
-        const filterType = req.query.filterType ? String(req.query.filterType) : "week";
+        const rawFilter = req.query.filterType ? String(req.query.filterType) : "week";
         const userId = req.query.userId ? Number(req.query.userId) : 0;
         const departmentId = req.query.departmentId ? Number(req.query.departmentId) : 0;
         const role = req.query.role ? String(req.query.role) : "USER";
 
-        await executeQuery("DELETE FROM user_notifications WHERE created_at < NOW() - INTERVAL '7 days';");
+        await notificationService.deleteOldNotificationsService();
 
-        const timeInterval = filterType === "hour" ? "1 hour" : "7 days";
+        // HOURLY / WEEKLY ફિલ્ટરને કેસ-ઇન્સેન્સિટિવ હેન્ડલ કર્યું
+        const normalizedFilter = rawFilter.toLowerCase();
+        const timeInterval = (normalizedFilter === "hour" || normalizedFilter === "hourly") ? "1 hour" : "7 days";
+
         const superAdmin = isSuperAdminRole(role, userId);
         const deptHead = isHeadRole(role);
 
@@ -84,63 +73,33 @@ export const getFilteredNotifications = async (req: Request, res: Response): Pro
                 )
             `;
         } else if (deptHead) {
-            params.push(departmentId);
+            params.push(departmentId); // $1
+            params.push(userId);       // $2
             accessWhere = `
                 AND (
-                    un.department_id = $${params.length}
-                    OR un.user_id = $${params.length + 1}
+                    un.department_id = $1
+                    OR un.user_id = $2
                     OR un.notification_type = 'Welcome'
                     OR LOWER(un.title) LIKE '%welcome%'
                 )
             `;
-            params.push(userId);
         } else {
-            params.push(userId);
+            params.push(userId); // $1
             accessWhere = `
                 AND (
-                    un.user_id = $${params.length}
+                    un.user_id = $1
                     OR un.notification_type = 'Welcome'
                     OR LOWER(un.title) LIKE '%welcome%'
                 )
             `;
         }
 
-        const fetchQuery = `
-            SELECT 
-                un.id,
-                un.user_id,
-                un.department_id,
-                un.title,
-                un.title as subject,
-                un.message,
-                un.is_read,
-                un.head_approved,
-                un.admin_approved,
-                un.notification_type,
-                un.created_at,
-                u.full_name as name,
-                u.username,
-                u.suid,
-                d.name as department_name,
-                CASE 
-                    WHEN un.notification_type = 'password_reset' AND un.head_approved = true AND un.admin_approved = true THEN 'Approved'
-                    WHEN un.notification_type = 'password_reset' THEN 'Pending'
-                    ELSE COALESCE(un.notification_type, 'Notification')
-                END as status
-            FROM user_notifications un
-            LEFT JOIN users u ON un.user_id = u.id
-            LEFT JOIN departments d ON un.department_id = d.id
-            WHERE un.created_at >= NOW() - INTERVAL '${timeInterval}'
-            ${accessWhere}
-            ORDER BY un.created_at DESC;
-        `;
-
-        const { rows } = await executeQuery(fetchQuery, params);
+        const result = await notificationService.fetchFilteredNotificationsService(timeInterval, accessWhere, params);
 
         return res.status(200).json({
             success: true,
-            count: rows.length,
-            notifications: rows,
+            count: result.rows.length,
+            notifications: result.rows,
         });
     } catch (error) {
         console.error("Fetch notifications error:", error);
@@ -148,27 +107,26 @@ export const getFilteredNotifications = async (req: Request, res: Response): Pro
     }
 };
 
+// ૩. Update Notification Status
 export const updateNotificationStatus = async (req: Request, res: Response): Promise<any> => {
     try {
         const idParam = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-const notificationId = parseInt(String(idParam), 10);
+        const notificationId = parseInt(String(idParam), 10);
         const { action, type, newPassword } = req.body;
 
         if (isNaN(notificationId)) {
             return res.status(400).json({ success: false, message: "Invalid Notification ID" });
         }
 
-        const notifRes = await executeQuery("SELECT * FROM user_notifications WHERE id = $1", [notificationId]);
+        const currentNotif = await notificationService.getNotificationByIdService(notificationId);
 
-        if (notifRes.rowCount === 0) {
+        if (!currentNotif) {
             return res.status(404).json({ success: false, message: "Notification record not found" });
         }
 
-        const currentNotif = notifRes.rows[0];
-
         if (type === "head") {
             if (action === "decline") {
-                await executeQuery("DELETE FROM user_notifications WHERE id = $1", [notificationId]);
+                await notificationService.removeNotificationService(notificationId);
                 return res.status(200).json({
                     success: true,
                     message: "Declined and removed by Department Head successfully.",
@@ -176,15 +134,11 @@ const notificationId = parseInt(String(idParam), 10);
             }
 
             if (action === "approve") {
-                const update = await executeQuery(
-                    "UPDATE user_notifications SET head_approved = true WHERE id = $1 RETURNING *",
-                    [notificationId]
-                );
-
+                const updatedData = await notificationService.updateHeadApprovalService(notificationId);
                 return res.status(200).json({
                     success: true,
                     message: "Approved by Head. Forwarded to Super Admin.",
-                    data: update.rows[0],
+                    data: updatedData,
                 });
             }
         }
@@ -198,7 +152,7 @@ const notificationId = parseInt(String(idParam), 10);
             }
 
             if (action === "decline") {
-                await executeQuery("DELETE FROM user_notifications WHERE id = $1", [notificationId]);
+                await notificationService.removeNotificationService(notificationId);
                 return res.status(200).json({
                     success: true,
                     message: "Declined and removed by Super Admin successfully.",
@@ -206,15 +160,11 @@ const notificationId = parseInt(String(idParam), 10);
             }
 
             if (action === "approve") {
-                const update = await executeQuery(
-                    "UPDATE user_notifications SET admin_approved = true WHERE id = $1 RETURNING *",
-                    [notificationId]
-                );
-
+                const updatedData = await notificationService.updateAdminApprovalService(notificationId);
                 return res.status(200).json({
                     success: true,
                     message: "Admin permission granted. Password input activated for Department Head.",
-                    data: update.rows[0],
+                    data: updatedData,
                 });
             }
         }
@@ -234,12 +184,7 @@ const notificationId = parseInt(String(idParam), 10);
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-            await executeQuery("UPDATE users SET password = $1 WHERE id = $2", [
-                hashedPassword,
-                currentNotif.user_id,
-            ]);
-
-            await executeQuery("DELETE FROM user_notifications WHERE id = $1", [notificationId]);
+            await notificationService.updateUserPasswordService(hashedPassword, currentNotif.user_id, notificationId);
 
             return res.status(200).json({
                 success: true,
@@ -254,6 +199,7 @@ const notificationId = parseInt(String(idParam), 10);
     }
 };
 
+// ૪. Delete Single Notification
 export const deleteNotification = async (req: Request, res: Response): Promise<any> => {
     try {
         const idParam = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -263,7 +209,7 @@ export const deleteNotification = async (req: Request, res: Response): Promise<a
             return res.status(400).json({ success: false, message: "Invalid ID format" });
         }
 
-        await executeQuery("DELETE FROM user_notifications WHERE id = $1", [numericId]);
+        await notificationService.removeNotificationService(numericId);
 
         return res.status(200).json({
             success: true,
@@ -275,6 +221,7 @@ export const deleteNotification = async (req: Request, res: Response): Promise<a
     }
 };
 
+// ૫. Mark Single Notification as Read
 export const markNotificationRead = async (req: Request, res: Response): Promise<any> => {
     try {
         const idParam = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -284,22 +231,20 @@ export const markNotificationRead = async (req: Request, res: Response): Promise
             return res.status(400).json({ success: false, message: "Invalid ID format" });
         }
 
-        const update = await executeQuery(
-            "UPDATE user_notifications SET is_read = true WHERE id = $1 RETURNING *",
-            [numericId]
-        );
+        const updateResult = await notificationService.markReadService(numericId);
 
-        if (update.rowCount === 0) {
+        if (updateResult.rowCount === 0) {
             return res.status(404).json({ success: false, message: "Notification not found" });
         }
 
-        return res.status(200).json({ success: true, message: "Marked as read", data: update.rows[0] });
+        return res.status(200).json({ success: true, message: "Marked as read", data: updateResult.rows[0] });
     } catch (error) {
         console.error("Mark read error:", error);
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
 
+// ૬. Mark All Notifications as Read for User
 export const markAllNotificationsReadForUser = async (req: Request, res: Response): Promise<any> => {
     try {
         const userId = req.params.userId ? parseInt(String(req.params.userId), 10) : NaN;
@@ -307,7 +252,7 @@ export const markAllNotificationsReadForUser = async (req: Request, res: Respons
             return res.status(400).json({ success: false, message: "Invalid user id" });
         }
 
-        await executeQuery("UPDATE user_notifications SET is_read = true WHERE user_id = $1", [userId]);
+        await notificationService.markAllReadForUserService(userId);
 
         return res.status(200).json({ success: true, message: "All notifications marked as read" });
     } catch (error) {
@@ -315,3 +260,39 @@ export const markAllNotificationsReadForUser = async (req: Request, res: Respons
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
+
+// ૭. Create Welcome Notification
+export const createWelcomeNotification = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { userId, departmentId, name } = req.body;
+
+        if (!userId || !name) {
+            return res.status(400).json({ success: false, message: "User ID and Name are required" });
+        }
+
+        const isExists = await notificationService.checkWelcomeNotificationExistsService(Number(userId));
+
+        if (!isExists) {
+            const message = `Jai Swaminarayan ${name}, Gurukul digital system ma tamaru account successfully create thai gayu chhe.`;
+            const newWelcomeNotif = await notificationService.createWelcomeNotificationService(
+                Number(userId),
+                departmentId ? Number(departmentId) : null,
+                message
+            );
+
+            return res.status(201).json({
+                success: true,
+                message: "Welcome notification created successfully.",
+                data: newWelcomeNotif
+            });
+        } else {
+            return res.status(200).json({
+                success: true,
+                message: "Welcome notification already exists for this user."
+            });
+        }
+    } catch (error) {
+        console.error("Create welcome notification error:", error);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
+}; 
