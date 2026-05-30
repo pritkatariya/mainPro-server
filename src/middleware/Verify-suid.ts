@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import pool from "../database/start.js";
 
+// Database query ચલાવવા માટેનું હેલ્પર ફંક્શન
 const executeQuery = async (text: string, params: any[]) => {
     try {
         return await pool.query(text, params);
-    } catch {
+    } catch (error) {
         throw new Error("Database query failed");
     }
 };
@@ -46,6 +47,7 @@ export const verifySuidUser = async (req: Request, res: Response, next: NextFunc
             });
         }
 
+        // નેક્સ્ટ કંટ્રોલર માટે ડેટા req.body માં સેટ કરો
         req.body.verifiedUserId = user.id;
         req.body.verifiedUserTargetDept = user.department_id;
         req.body.verifiedUserFullName = user.full_name;
@@ -53,7 +55,7 @@ export const verifySuidUser = async (req: Request, res: Response, next: NextFunc
 
         next();
     } catch (error) {
-        console.error(error);
+        console.error("verifySuidUser Middleware Error:", error);
         return res.status(500).json({
             success: false,
             message: "Verification server error"

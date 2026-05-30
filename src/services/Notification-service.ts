@@ -14,13 +14,29 @@ export const createNotificationService = async (userId: number, deptId: number, 
 };
 
 export const fetchFilteredNotificationsService = async (timeInterval: string, accessWhere: string, params: any[]) => {
+    // COALESCE નો ઉપયોગ કરીને NULL વેલ્યુ આવતી અટકાવી જેથી ફ્રન્ટએન્ડ ક્રેશ ન થાય
     const query = `
-        SELECT un.id, un.user_id, un.department_id, un.title, un.title as subject, un.message, un.is_read, un.head_approved, un.admin_approved, un.notification_type, un.created_at, u.full_name as name, u.username, u.suid, d.name as department_name,
-        CASE 
-            WHEN un.notification_type = 'password_reset' AND un.head_approved = true AND un.admin_approved = true THEN 'Approved'
-            WHEN un.notification_type = 'password_reset' THEN 'Pending'
-            ELSE COALESCE(un.notification_type, 'Notification')
-        END as status
+        SELECT 
+            un.id, 
+            un.user_id, 
+            un.department_id, 
+            un.title, 
+            un.title as subject, 
+            un.message, 
+            un.is_read, 
+            un.head_approved, 
+            un.admin_approved, 
+            un.notification_type, 
+            un.created_at, 
+            COALESCE(u.full_name, 'Gurukul Member') as name, 
+            COALESCE(u.username, 'user_' || un.user_id) as username, 
+            COALESCE(u.suid, 'N/A') as suid, 
+            COALESCE(d.dept_name, 'General') as department_name,
+            CASE 
+                WHEN un.notification_type = 'password_reset' AND un.head_approved = true AND un.admin_approved = true THEN 'Approved'
+                WHEN un.notification_type = 'password_reset' THEN 'Pending'
+                ELSE COALESCE(un.notification_type, 'Notification')
+            END as status
         FROM user_notifications un
         LEFT JOIN users u ON un.user_id = u.id
         LEFT JOIN departments d ON un.department_id = d.id
@@ -60,4 +76,19 @@ export const markReadService = async (id: number) => {
 
 export const markAllReadForUserService = async (userId: number) => {
     await pool.query("UPDATE user_notifications SET is_read = true WHERE user_id = $1", [userId]);
+};
+
+export const checkWelcomeNotificationExistsService = async (userId: number) => {
+    const query = `SELECT id FROM user_notifications WHERE user_id = $1 AND notification_type = 'Welcome'`;
+    const result = await pool.query(query, [userId]);
+    return (result.rowCount ?? 0) > 0; 
+};
+
+export const createWelcomeNotificationService = async (userId: number, deptId: number | null, message: string) => {
+    const query = `
+        INSERT INTO user_notifications (user_id, department_id, title, message, notification_type)
+        VALUES ($1, $2, 'WELCOME TO GURUKUL SYSTEM', $3, 'Welcome') RETURNING *;
+    `;
+    const result = await pool.query(query, [userId, deptId, message]);
+    return result.rows[0];
 };

@@ -13,6 +13,8 @@ export const CreateData = async (req: Request, res: Response) => {
     const result = await AchamanService.createNewImage(title, imageFile);
     res.status(201).json({ success: true, message: "Image uploaded successfully", data: result.rows[0] });
   } catch (error) {
+    // આ લાઈન ઉમેરો, આનાથી ટર્મિનલમાં એરર દેખાશે
+    console.error("CRITICAL BACKEND ERROR:", error); 
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
@@ -20,8 +22,9 @@ export const CreateData = async (req: Request, res: Response) => {
 export const GetAllData = async (req: Request, res: Response) => {
   try {
     const result = await AchamanService.getAllImages();
-    res.status(200).json({ success: true, count: result.rows.length, images: result.rows });
+    res.status(200).json({ success: true, data: result.rows }); 
   } catch (error) {
+    console.error("Backend Error:", error); // એરર લોગ કરો
     res.status(500).json({ success: false, message: "Failed to fetch images" });
   }
 };
