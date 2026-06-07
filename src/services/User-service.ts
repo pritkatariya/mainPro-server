@@ -14,9 +14,9 @@ export const checkExistingSuid = async (suid: string) => {
 
 export const createUserService = async (params: any[]) => {
     const query = `
-        INSERT INTO users (full_name, username, password, std, roll_number, role, department_id, profile_image_url, suid)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING id, full_name, username, role, department_id, suid, profile_image_url;
+        INSERT INTO users (full_name, username, password, std, roll_number, date_of_birth, role, department_id, profile_image_url, suid)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id, full_name, username, role, department_id, suid, profile_image_url, date_of_birth;
     `;
     return await pool.query(query, params);
 };
@@ -45,7 +45,7 @@ export const removeAdmitRequestBySuid = async (suid: string) => {
 
 export const getAllUsersDataListService = async () => {
     const query = `
-        SELECT id, full_name, username, std, roll_number, suid, department_id, role, joined_date, profile_image_url 
+        SELECT id, full_name, username, std, roll_number, date_of_birth, suid, department_id, role, joined_date, profile_image_url 
         FROM users ORDER BY id DESC;
     `;
     return await pool.query(query);
@@ -67,14 +67,15 @@ export const updateUserService = async (params: any[]) => {
             password = COALESCE($3, password),
             std = COALESCE($4, std),
             roll_number = COALESCE($5, roll_number),
-            role = COALESCE($6, role),
-            department_id = COALESCE($7, department_id),
-            profile_image_url = COALESCE($8, profile_image_url),
-            suid = COALESCE($9, suid),
-            section_id = COALESCE($10, section_id), -- 👈 આ લાઈન નવી ઉમેરી
+            date_of_birth = COALESCE($6, date_of_birth),
+            role = COALESCE($7, role),
+            department_id = COALESCE($8, department_id),
+            profile_image_url = COALESCE($9, profile_image_url),
+            suid = COALESCE($10, suid),
+            section_id = COALESCE($11, section_id),
             updated_at = NOW()
-        WHERE id = $11 -- 👈 આ $10 માંથી $11 થઈ ગયું
-        RETURNING id, full_name, username, role, department_id, suid, profile_image_url;
+        WHERE id = $12
+        RETURNING id, full_name, username, role, department_id, suid, profile_image_url, date_of_birth;
     `;
     return await pool.query(query, params);
 };

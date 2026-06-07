@@ -33,20 +33,26 @@ const fileFilter = (
     const isAudio =
         file.mimetype.startsWith("audio/") ||
         /\.(mp3|wav)$/.test(fileName);
+    const isVideo =
+        file.mimetype.startsWith("video/") ||
+        /\.(mp4|mov|avi|mkv)$/.test(fileName);
+    const isPdf =
+        file.mimetype === "application/pdf" ||
+        /\.pdf$/.test(fileName);
 
-    if (isImage || isAudio) {
+    if (isImage || isAudio || isVideo || isPdf) {
         cb(null, true);
         return;
     }
 
-    cb(new Error("Only image and MP3/WAV audio files are allowed!"));
+    cb(new Error("Only image, video, audio, and PDF files are allowed!"));
 };
 
 export const upload = multer({
     storage,
     fileFilter,
     limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB Limit
+        fileSize: 100 * 1024 * 1024, // 50MB Limit
         files: 20,
     },
 });
@@ -85,9 +91,13 @@ export const uploadToCloudinary = async (
                 if (!result) {
                     return reject(new Error("Cloudinary upload failed: No result returned from server."));
                 }
-                
-                // 🔗 સિક્યોર HTTPS URL રિટર્ન કરશે
-                resolve(result.secure_url);
+                // 🔗 સિક્યોર HTTPS URL પૂર્ણપણે ઉપલબ્ધ ન હોય તો સામાન્ય urlFallback પણ ટ્રાય કરો
+                const secureUrl = result.secure_url || result.url || result.location || "";
+                if (!secureUrl) {
+                    return reject(new Error("Cloudinary upload failed: no public URL found in response."));
+                }
+
+                resolve(secureUrl);
             }
         );
 

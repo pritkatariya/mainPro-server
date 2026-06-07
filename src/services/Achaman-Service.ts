@@ -11,6 +11,7 @@ export const getSingleImage = async (id: string) => {
 
 export const createNewImage = async (title: string, imageFile: any) => {
     const imageUrl = await uploadToCloudinary(imageFile);
+    // અહીં લિમિટ નથી, એટલે આ ક્વેરી હવે કામ કરશે કારણ કે હવે url TEXT છે
     const query = "INSERT INTO amrut_images (title, url, created_at) VALUES ($1, $2, NOW()) RETURNING *";
     return await pool.query(query, [title.trim(), imageUrl]);
 };

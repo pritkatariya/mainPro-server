@@ -11,7 +11,14 @@ export const login = async (req: Request, res: Response) => {
 
     try {
         let user = null;
-        const queryText = "SELECT * FROM users WHERE username = $1";
+        const queryText = `
+            SELECT u.*, r.role_code AS role_code, r.permissions AS role_permissions
+            FROM users u
+            LEFT JOIN roles r
+                ON LOWER(u.role) = LOWER(r.role_code)
+                OR LOWER(u.role) = LOWER(r.role_name)
+            WHERE u.username = $1
+        `;
 
         try {
             user = (await pool.query(queryText, [username])).rows[0];
@@ -25,9 +32,31 @@ export const login = async (req: Request, res: Response) => {
                 (user.password.startsWith("$2b$") && (await bcrypt.compare(password, user.password)));
 
             if (isPasswordMatch) {
+                const roleCode = user.role_code || user.role;
+                let permissions = {};
+
+                if (user.role_permissions) {
+                    try {
+                        permissions =
+                            typeof user.role_permissions === "string"
+                                ? JSON.parse(user.role_permissions)
+                                : user.role_permissions;
+                    } catch {
+                        permissions = {};
+                    }
+                }
+
                 const userResponseData = { ...user };
                 delete userResponseData.password;
-                return res.json({ success: true, message: "Logged in successfully", user: userResponseData });
+                delete userResponseData.role_permissions;
+
+                return res.json({
+                    success: true,
+                    message: "Logged in successfully",
+                    user: userResponseData,
+                    user_role: roleCode,
+                    permissions,
+                });
             }
         }
 
