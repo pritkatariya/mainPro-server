@@ -10,21 +10,16 @@ export const login = async (req: Request, res: Response) => {
     }
 
     try {
-        let user = null;
+        // ક્વેરી ક્લીન કરી: સીધું r.role_code = u.role સાથે જોઈન કર્યું કારણ કે તે ફોરેન કી છે
         const queryText = `
             SELECT u.*, r.role_code AS role_code, r.permissions AS role_permissions
             FROM users u
-            LEFT JOIN roles r
-                ON LOWER(u.role) = LOWER(r.role_code)
-                OR LOWER(u.role) = LOWER(r.role_name)
+            LEFT JOIN roles r ON u.role = r.role_code
             WHERE u.username = $1
         `;
 
-        try {
-            user = (await pool.query(queryText, [username])).rows[0];
-        } catch (e) {
-            console.error("Error fetching user:", e);
-        }
+        const userResult = await pool.query(queryText, [username]);
+        const user = userResult.rows[0];
 
         if (user) {
             const isPasswordMatch =
@@ -62,6 +57,7 @@ export const login = async (req: Request, res: Response) => {
 
         return res.status(401).json({ message: "Invalid username or password" });
     } catch (error) {
+        console.error("Login error:", error);
         return res.status(500).json({ message: "Login error, internal server failure" });
     }
 };
@@ -69,22 +65,16 @@ export const login = async (req: Request, res: Response) => {
 export const getAllDepartments = async (_req: Request, res: Response): Promise<any> => {
     try {
         const queryText = "SELECT id, dept_name FROM departments WHERE is_active = TRUE ORDER BY id ASC;";
-        let rows = [];
+        const result = await pool.query(queryText);
 
-        try {
-            rows = (await pool.query(queryText)).rows;
-        } catch (e) {
-            console.error("Error fetching departments:", e);
-            rows = [];
-        }
-
-        const formattedDepartments = rows.map((dept: any) => ({
+        const formattedDepartments = result.rows.map((dept: any) => ({
             id: dept.id,
             name: dept.dept_name,
         }));
 
         return res.status(200).json({ success: true, departments: formattedDepartments });
     } catch (error) {
+        console.error("Error fetching departments:", error);
         return res.status(500).json({ success: false, message: "Error fetching departments" });
     }
 };
@@ -102,72 +92,45 @@ export const handleForgotPasswordRequest = async (req: Request, res: Response): 
     } = req.body;
 
     try {
+        // નવી 'forgot_requests' ટેબલમાં પરફેક્ટ ડેટા ઇન્સર્ટ
         const insertQuery = `
             INSERT INTO forgot_requests (date, department_id, suid, username, subject, request_text, status)
             VALUES ($1, $2, $3, $4, $5, $6, 'Pending') RETURNING id;
         `;
-
         const params = [date, Number(department_id), suid, username, subject, request_text];
-
-        try {
-            await pool.query(insertQuery, params);
-        } catch (e) {
-            console.error("Error inserting forgot password request:", e);
-        }
+        await pool.query(insertQuery, params);
 
         const notifTitle = `New Account Request: ${subject}`;
         const notifMessage = `સેવક ${verifiedUserFullName} (SUID: ${suid}) દ્વારા પોતાના ખાતા માટે વિનંતી મોકલવામાં આવી છે.`;
 
+        // ડિપાર્ટમેન્ટ હેડ શોધવાની ક્વેરી
         const findHeadQuery = `
             SELECT id FROM users 
-            WHERE department_id = $1 AND role = 'department main' 
+            WHERE department_id = $1 AND role = 'department-main' 
             LIMIT 1;
         `;
-
-        let headUser = null;
-
-        try {
-            headUser = (await pool.query(findHeadQuery, [verifiedUserTargetDept])).rows[0];
-        } catch (e) {
-            console.error("Error fetching department head:", e);
-            headUser = null;
-        }
+        const headResult = await pool.query(findHeadQuery, [verifiedUserTargetDept]);
+        const headUser = headResult.rows[0];
 
         const insertNotifQuery = `
             INSERT INTO user_notifications (user_id, title, message, notification_type) 
             VALUES ($1, $2, $3, 'Request');
         `;
 
+        // ૧. જો ડિપાર્ટમેન્ટ હેડ મળે તો તેને નોટિફિકેશન મોકલો
         if (headUser) {
-            try {
-                await pool.query(insertNotifQuery, [headUser.id, notifTitle, notifMessage]);
-            } catch (e) {
-                console.error("Error inserting notification:", e);
-            }
-
-            try {
-            } catch (e) {
-                console.error("Error inserting notification:", e);
-            }
+            await pool.query(insertNotifQuery, [headUser.id, notifTitle, notifMessage]);
         }
 
-        try {
-            await pool.query(insertNotifQuery, [123098, notifTitle, notifMessage]);
-        } catch (e) {
-            console.error("Error inserting notification:", e);
-        }
-
-        try {
-            await pool.query(insertNotifQuery, [123098, notifTitle, notifMessage]);
-        } catch (e) {
-            console.error("Error inserting notification:", e);
-        }
+        // ૨. સુપર એડમિન (123098) ને માત્ર એક જ વાર ક્લીન નોટિફિકેશન મોકલો (ડુપ્લીકેશન હટાવી દીધું)
+        await pool.query(insertNotifQuery, [123098, notifTitle, notifMessage]);
 
         return res.status(201).json({
             success: true,
             message: "Application submitted and routed to Department Head successfully!",
         });
     } catch (error) {
+        console.error("Error routing request:", error);
         return res.status(500).json({
             success: false,
             message: "Error routing verified application request",
