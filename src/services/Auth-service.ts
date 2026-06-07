@@ -11,11 +11,9 @@ export const getActiveDepartmentsService = async () => {
 };
 
 export const createForgotPasswordRecordService = async (params: any[]) => {
-    // નોંધ: જો તમે ડેટાબેઝ માઇગ્રેશનમાં 'forgot_requests' ટેબલ ન બનાવ્યું હોય, 
-    // તો આ ડેટા 'applications' અથવા 'user_notifications' ટેબલમાં પણ ઇન્સર્ટ કરી શકાય છે.
     const query = `
-        INSERT INTO forgot_requests (date, department_id, suid, username, subject, request_text, status)
-        VALUES ($1, $2, $3, $4, $5, $6, 'Pending') RETURNING id;
+        INSERT INTO forgot_requests (date, department_id, section_id, suid, username, subject, request_text, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending') RETURNING id;
     `;
     return await pool.query(query, params);
 };

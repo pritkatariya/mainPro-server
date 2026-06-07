@@ -63,6 +63,10 @@ export const uploadSong = async (req: Request, res: Response) => {
             }
         }
 
+        if ((!audioUrl || audioUrl === "") && (audioFile as any)?.path) {
+            audioUrl = String((audioFile as any).path);
+        }
+
         if (!audioUrl) {
             console.error("Upload completed but no audio URL was derived from the uploaded file:", audioFile);
             return res.status(500).json({ success: false, message: "Upload succeeded but no file URL returned by storage provider" });

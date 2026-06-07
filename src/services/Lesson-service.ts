@@ -10,7 +10,8 @@ export const getAllLessons = async () => {
     ORDER BY created_at DESC;
   `;
   try {
-    return await pool.query(query);
+    const result = await pool.query(query);
+    return result.rows;
   } catch (err) {
     console.error("[LessonService] getAllLessons Query Error:", err);
     throw err;
@@ -28,7 +29,8 @@ export const getLessonsByDept = async (dept_id: string) => {
     ORDER BY created_at DESC;
   `;
   try {
-    return await pool.query(query, [dept_id]);
+    const result = await pool.query(query, [dept_id]);
+    return result.rows;
   } catch (err) {
     console.error("[LessonService] getLessonsByDept Query Error:", err);
     throw err;
@@ -45,15 +47,36 @@ export const createLesson = async (
   media_url: string | null,
   media_type: string | null,
   thumbnail_url: string | null,
-  section_id: string | null = null
+  section_id: string | null = null,
+  assigned_to_user_id: string | null = null
 ) => {
   const query = `
-    INSERT INTO lessons (name, description, department_id, media_url, media_type, thumbnail_url, section_id, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-    RETURNING id, name, description, department_id, section_id, media_url, media_type, thumbnail_url, created_at;
+    INSERT INTO lessons (
+      name,
+      description,
+      department_id,
+      media_url,
+      media_type,
+      thumbnail_url,
+      section_id,
+      assigned_to_user_id,
+      created_at
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+    RETURNING id, name, description, department_id, section_id, assigned_to_user_id, media_url, media_type, thumbnail_url, created_at;
   `;
   try {
-    return await pool.query(query, [name, description, department_id, media_url, media_type, thumbnail_url, section_id]);
+    const result = await pool.query(query, [
+      name,
+      description,
+      department_id,
+      media_url,
+      media_type,
+      thumbnail_url,
+      section_id,
+      assigned_to_user_id,
+    ]);
+    return result.rows[0];
   } catch (err) {
     console.error("[LessonService] createLesson Query Error:", err);
     throw err;

@@ -4,9 +4,11 @@ import * as AuthController from "../Controller/Auth-controller.js";
 import * as RoleController from "../Controller/Role-controller.js";
 import * as GMusicController from "../Controller/Gmusic-controller.js";
 import * as ArtController from "../Controller/Art-controller.js";
+import * as GCultureController from "../Controller/GCulture-controller.js";
 import * as ApplicationController from "../Controller/Application-controller.js";
 import * as NotificationController from "../Controller/Notification-controller.js";
-import * as SectionController from "../Controller/Section-controller.js"; // 👈 નવો કંટ્રોલર ઈમ્પોર્ટ કર્યો (.js ખાસ રાખજો)
+import * as SectionController from "../Controller/Section-controller.js";
+import * as LessonController from "../Controller/Lesson-controller.js";
 
 import {
     getAllSongs,
@@ -61,6 +63,14 @@ router.get("/gurukul-art/onboarded-users", ArtController.getOnboardedGurukulArtU
 
 router.post("/gurukul-art/admit-request/approve/:id", ArtController.approveGurukulArtRequest);
 router.post("/gurukul-art/admit-request/decline/:id", ArtController.declineGurukulArtRequest);
+
+// G-Culture routes
+router.post("/g-culture/create-request", upload.single("image"), GCultureController.createGCultureRequest);
+router.get("/g-culture/admit-list", GCultureController.getGCultureRequests);
+router.get("/g-culture/onboarded-users", GCultureController.getOnboardedGCultureUsers);
+
+router.post("/g-culture/admit-request/approve/:id", GCultureController.approveGCultureRequest);
+router.post("/g-culture/admit-request/decline/:id", GCultureController.declineGCultureRequest);
 router.get("/student/get-filtered-notifications", ApplicationController.getAllApplications);
 router.put("/student/notification/status-update/:id", ApplicationController.updateApplicationStatus);
 router.delete("/student/notification/delete/:id", ApplicationController.deleteApplication);
@@ -78,5 +88,8 @@ router.delete("/sections/:id", SectionController.deleteSection);
 router.get("/amrut-images/:id", GetSingleData);
 router.put("/amrut-images/:id", upload.single("image"), UpdateData);
 router.delete("/amrut-images/:id", DeleteData);
+
+router.post("/lessons", upload.single("resource"), LessonController.createLesson);
+router.get("/lessons", LessonController.getLessons);
 
 export default router;
