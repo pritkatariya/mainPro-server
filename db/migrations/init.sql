@@ -6,9 +6,9 @@ DROP TABLE IF EXISTS admit_requests CASCADE;
 DROP TABLE IF EXISTS gurukul_songs CASCADE;
 DROP TABLE IF EXISTS overview_config CASCADE;
 DROP TABLE IF EXISTS amrut_images CASCADE;
-DROP TABLE IF EXISTS sections CASCADE;
 DROP TABLE IF EXISTS lessons CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS sections CASCADE;
 DROP TABLE IF EXISTS roles CASCADE;
 DROP TABLE IF EXISTS departments CASCADE;
 
@@ -22,6 +22,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- 1. DEPARTMENTS TABLE
 CREATE TABLE departments (
     id BIGSERIAL PRIMARY KEY,
     dept_name VARCHAR(255) NOT NULL UNIQUE,
@@ -34,24 +35,41 @@ CREATE TABLE departments (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 2. ROLES TABLE
 CREATE TABLE roles (
     id BIGSERIAL PRIMARY KEY,
     role_name VARCHAR(255) NOT NULL,
-    role_code VARCHAR(100) UNIQUE NOT NULL,
+    role_code VARCHAR(100) UNIQUE NOT NULL, -- આ યુનિક કોડ ફોરેન કી તરીકે વપરાશે
     permissions JSONB NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 3. SECTIONS TABLE (મુખ્ય સુધારો: ડેટા ટાઇપ BIGINT કર્યો અને Foreign Key સેટ કરી)
+CREATE TABLE sections (
+    id BIGSERIAL PRIMARY KEY,
+    department_id BIGINT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    section_head_id BIGINT, -- આને નીચે users ક્રિએટ થયા પછી ALTER કરીને લિંક કરીશું
+    users_id BIGINT[] DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_sections_department
+        FOREIGN KEY (department_id)
+        REFERENCES departments(id)
+        ON DELETE CASCADE
+);
+
+-- 4. USERS TABLE (મુખ્ય સુધારો: Role અને Section ને Foreign Key થી જોડ્યા)
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     full_name VARCHAR(255) NOT NULL,
     username VARCHAR(100) UNIQUE NOT NULL,
     password TEXT NOT NULL,
     suid VARCHAR(100) UNIQUE,
-    role VARCHAR(50) DEFAULT 'user',
-    department_id BIGINT DEFAULT 0,
-    section_id INT DEFAULT NULL,
+    role VARCHAR(100) DEFAULT 'user',
+    department_id BIGINT DEFAULT 5,   -- Default 'Super Admin' રાખ્યું જેથી 0 ની એરર ન આવે
+    section_id BIGINT DEFAULT NULL,   -- sections ટેબલ સાથે લિંક થશે
     std VARCHAR(50) DEFAULT 'Main',
     roll_number INT,
     date_of_birth DATE,
@@ -66,19 +84,24 @@ CREATE TABLE users (
     CONSTRAINT fk_users_department
         FOREIGN KEY (department_id)
         REFERENCES departments(id)
-        ON DELETE SET DEFAULT
+        ON DELETE SET NULL,
+    CONSTRAINT fk_users_role
+        FOREIGN KEY (role)
+        REFERENCES roles(role_code)
+        ON DELETE SET DEFAULT ON UPDATE CASCADE,
+    CONSTRAINT fk_users_section
+        FOREIGN KEY (section_id)
+        REFERENCES sections(id)
+        ON DELETE SET NULL
 );
 
-CREATE TABLE sections (
-    id SERIAL PRIMARY KEY,
-    department_id INT NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    section_head_id INT,
-    users_id INT[] DEFAULT '{}',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- હવે sections ટેબલના head_id ને યુઝર ટેબલ સાથે જોડી દઈએ
+ALTER TABLE sections 
+ADD CONSTRAINT fk_sections_head 
+FOREIGN KEY (section_head_id) REFERENCES users(id) ON DELETE SET NULL;
 
+
+-- 5. OVERVIEW CONFIG TABLE
 CREATE TABLE overview_config (
     id INT PRIMARY KEY DEFAULT 1,
     hero_images JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -90,6 +113,7 @@ CREATE TABLE overview_config (
     CONSTRAINT overview_config_single_row CHECK (id = 1)
 );
 
+-- 6. AMRUT IMAGES TABLE
 CREATE TABLE amrut_images (
     id BIGSERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -104,6 +128,7 @@ CREATE TABLE amrut_images (
         ON DELETE SET NULL
 );
 
+-- 7. ADMIT REQUESTS TABLE
 CREATE TABLE admit_requests (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -124,6 +149,7 @@ CREATE TABLE admit_requests (
         ON DELETE CASCADE
 );
 
+-- 8. APPLICATIONS TABLE
 CREATE TABLE applications (
     id BIGSERIAL PRIMARY KEY,
     date DATE DEFAULT CURRENT_DATE,
@@ -150,10 +176,28 @@ CREATE TABLE applications (
         ON DELETE CASCADE
 );
 
+-- આ ટેબલ સ્કીમામાં ખૂટતું હતું, જે મેં ઉમેરી દીધું છે
+DROP TABLE IF EXISTS forgot_requests CASCADE;
+
+CREATE TABLE forgot_requests (
+    id BIGSERIAL PRIMARY KEY,
+    date DATE DEFAULT CURRENT_DATE,
+    department_id BIGINT,
+    section_id BIGINT DEFAULT NULL,
+    suid VARCHAR(100) NOT NULL,
+    username VARCHAR(100) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    request_text TEXT NOT NULL,
+    status VARCHAR(50) DEFAULT 'Pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_forgot_dept FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL
+);
+
+-- 9. USER NOTIFICATIONS TABLE
 CREATE TABLE user_notifications (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    department_id BIGINT DEFAULT 0,
+    department_id BIGINT DEFAULT 1, -- Default 1 રાખ્યું જે વેલિડ આઈડી છે
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
@@ -165,9 +209,14 @@ CREATE TABLE user_notifications (
     CONSTRAINT fk_notifications_user
         FOREIGN KEY (user_id)
         REFERENCES users(id)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+    CONSTRAINT fk_notifications_department
+        FOREIGN KEY (department_id)
+        REFERENCES departments(id)
+        ON DELETE SET NULL
 );
 
+-- 10. GURUKUL SONGS TABLE
 CREATE TABLE gurukul_songs (
     id BIGSERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL UNIQUE,
@@ -181,13 +230,14 @@ CREATE TABLE gurukul_songs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 11. LESSONS TABLE (મુખ્ય સુધારો: section_id નો ડેટા ટાઇપ BIGINT કર્યો)
 CREATE TABLE lessons (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
     department_id BIGINT NOT NULL,
     section_map_id INT DEFAULT NULL,
-    section_id INT DEFAULT NULL,
+    section_id BIGINT DEFAULT NULL, -- BIGINT કર્યો કારણ કે sections.id હવે BIGINT છે
     assigned_to_user_id BIGINT DEFAULT NULL,
     media_url TEXT,
     thumbnail_url TEXT,
@@ -208,6 +258,7 @@ CREATE TABLE lessons (
         ON DELETE SET NULL
 );
 
+-- TRIGGERS SETUP
 CREATE TRIGGER trg_departments_updated_at BEFORE UPDATE ON departments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER trg_roles_updated_at BEFORE UPDATE ON roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -217,6 +268,7 @@ CREATE TRIGGER trg_applications_updated_at BEFORE UPDATE ON applications FOR EAC
 CREATE TRIGGER trg_notifications_updated_at BEFORE UPDATE ON user_notifications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER trg_gurukul_songs_updated_at BEFORE UPDATE ON gurukul_songs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- SEED DATA (નોંધ: સિક્વન્સ જાળવવા માટે પહેલા રોલ અને ડિપાર્ટમેન્ટ ઇન્સર્ટ કર્યા છે)
 INSERT INTO departments (id, dept_name, dept_code, head_name, description) VALUES
 (1, 'G-Music Department', 'G-MUSIC', 'Music Head', 'Vocal, Instrumental and Classical Music Training.'),
 (2, 'Gurukul Art Department', 'GURUKUL-ART', 'Art Head', 'Traditional Art, Painting and Cultural Crafts.'),
@@ -225,20 +277,20 @@ INSERT INTO departments (id, dept_name, dept_code, head_name, description) VALUE
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO roles (role_name, role_code, permissions) VALUES
-('super-admin', 'super-admin', '{
-	"role": {"view": true,"create": true},"user": {"view": true,"create": true},"overview": {"music": true,"editor": true,"manage": true}}'::jsonb),
-('admin', 'admin', '{
-	"role": {"view": true,"create": true},"user": {"view": true,"create": true},"overview": {"music": true,"editor": true,"manage": true}}'::jsonb),
+('super-admin', 'super-admin', '{"role": {"view": true,"create": true},"user": {"view": true,"create": true},"overview": {"music": true,"editor": true,"manage": true}}'::jsonb),
+('admin', 'admin', '{"role": {"view": true,"create": true},"user": {"view": true,"create": true},"overview": {"music": true,"editor": true,"manage": true}}'::jsonb),
 ('department main', 'department_main', '{"view": true, "edit": true, "approve": true}'::jsonb),
 ('user', 'user', '{"view": true}'::jsonb)
 ON CONFLICT (role_code) DO NOTHING;
 
+-- યુઝર ઇન્સર્ટ કરતી વખતે રોલ 'super-admin' મેચ કર્યો જેથી ફોરેન કી વેલિડેટ થાય
 INSERT INTO users (id, full_name, username, password, suid, role, department_id, std, account_status, profile_image_url) VALUES 
-(123098, 'Super Admin Principal', 'super-admin', 'admin123', 'SUID-ADMIN-01', 'super_admin', 5, 'Main', 'Active', 'https://instagram.fraj3-5.fna.fbcdn.net/v/t51.82787-15/638287693_18002290379884955_4530879865478518753_n.webp?_nc_cat=101&ig_cache_key=MzgzNzMyNDE5NDk2NzIyNzUwMA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTA4MC5zZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=0-U5-5rPOScQ7kNvwE6AMk6&_nc_oc=AdqMDJfLYj301zZe9IEKTQnB7FRxjoiS8rOl52rZCXndUCqVGiws4PlUjpYlpanYds8Aw3JagGxWakyTopNpCbcy&_nc_ad=z-m&_nc_cid=1174&_nc_zt=23&_nc_ht=instagram.fraj3-5.fna&_nc_gid=SigmqrSzFg1LMXXAZm72rA&_nc_ss=7a22e&oh=00_Af5QxXkZxiTKbRWXbMcrsAdpTV_8RQ7QIlJ57uGHZQYh6w&oe=6A1C9777')
+(123098, 'Super Admin Principal', 'super-admin', 'admin123', 'SUID-ADMIN-01', 'super-admin', 5, 'Main', 'Active', 'https://instagram.fraj3-5.fna.fbcdn.net/v/t51.82787-15/638287693_18002290379884955_4530879865478518753_n.webp?_nc_cat=101&ig_cache_key=MzgzNzMyNDE5NDk2NzIyNzUwMA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTA4MC5zZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=0-U5-5rPOScQ7kNvwE6AMk6&_nc_oc=AdqMDJfLYj301zZe9IEKTQnB7FRxjoiS8rOl52rZCXndUCqVGiws4PlUjpYlpanYds8Aw3JagGxWakyTopNpCbcy&_nc_ad=z-m&_nc_cid=1174&_nc_zt=23&_nc_ht=instagram.fraj3-5.fna&_nc_gid=SigmqrSzFg1LMXXAZm72rA&_nc_ss=7a22e&oh=00_Af5QxXkZxiTKbRWXbMcrsAdpTV_8RQ7QIlJ57uGHZQYh6w&oe=6A1C9777')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO overview_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
+-- INDEXES SETUP
 CREATE INDEX idx_users_suid ON users(suid);
 CREATE INDEX idx_users_department_id ON users(department_id);
 CREATE INDEX idx_users_role ON users(role);
@@ -261,6 +313,7 @@ CREATE INDEX idx_lessons_department ON lessons(department_id);
 CREATE INDEX idx_lessons_section ON lessons(section_id);
 CREATE INDEX idx_lessons_assigned_to ON lessons(assigned_to_user_id);
 
+-- SEQUENCES RESET
 SELECT setval('departments_id_seq', COALESCE((SELECT MAX(id) FROM departments), 1), true);
 SELECT setval('roles_id_seq', COALESCE((SELECT MAX(id) FROM roles), 1), true);
 SELECT setval('users_id_seq', COALESCE((SELECT MAX(id) FROM users), 1), true);
